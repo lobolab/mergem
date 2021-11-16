@@ -18,15 +18,15 @@ allowed_file_formats = ["sbml", "xml", "mat", "m", "matlab", "json", "yaml"]
 
 
 @click.command()
-@click.option('-i', help='Input model filenames', multiple=True)
+@click.argument('input_filenames', nargs=-1, type=click.Path(exists=True))
 @click.option('-obj', nargs=1, default='merge',
               help="Set objective: 'merge' all objectives (default) or 1, 2, 3.. (objective from one of the input models)")
 @click.option('-o', nargs=1, help='Save model as (filename with format .xml, .sbml, etc.)')
 @click.option('-v', help='Print merging statistics', is_flag=True)
 @click.option('-up', help='Update ID mapping table', is_flag=True)
 @click.version_option(__version.version + "\nLobo Lab (https://lobolab.umbc.edu)")
-def main(i, obj, o=None, v=False, up=False):
-    model_filenames = i
+def main(input_filenames, obj, o=None, v=False, up=False):
+    model_filenames = input_filenames
     objective = obj
     output_filename = o
     print_stats = v
