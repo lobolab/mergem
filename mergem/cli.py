@@ -26,6 +26,11 @@ allowed_file_formats = ["sbml", "xml", "mat", "m", "matlab", "json", "yaml"]
 @click.option('-up', help='Update ID mapping table', is_flag=True)
 @click.version_option(__version.version + "\nLobo Lab (https://lobolab.umbc.edu)")
 def main(input_filenames, obj, o=None, v=False, up=False):
+    """
+    mergem takes genome-scale metabolic models as input, merges them into a single model
+    and saves merged model as .xml. Users can optionally select the objective and provide
+    an output filename for merged model.
+    """
     model_filenames = input_filenames
     objective = obj
     output_filename = o
@@ -39,7 +44,7 @@ def main(input_filenames, obj, o=None, v=False, up=False):
         click.secho('Updating Metabolite ID mapper. This process may take a few hours.. ')
         update_id_mapper()
         click.secho('Metabolite ID mapper updated. ', fg='green')
-        if len(i) == 0:
+        if len(model_filenames) == 0:
             sys.exit()
 
     if len(model_filenames) < 2:
