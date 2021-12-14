@@ -19,8 +19,8 @@ import ssl
 
 curr_dir = os.path.dirname(os.path.abspath(__file__))
 files_dir = os.path.join(curr_dir, "downloads/")
-pickle_dir = os.path.join(curr_dir, "/data/")
-log_dir = os.path.join(curr_dir, "/logs/")
+pickle_dir = os.path.join(curr_dir, "data/")
+log_dir = os.path.join(curr_dir, "logs/")
 
 # Database URLs
 modelSeed_met_url = "https://raw.githubusercontent.com/ModelSEED/ModelSEEDDatabase/master/Biochemistry/compounds.tsv"
