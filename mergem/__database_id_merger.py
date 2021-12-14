@@ -43,14 +43,38 @@ chebi_compound_structure_filename = files_dir + "chebi_structures.csv"
 chebi_compounds_zipped_filename = files_dir + "chebi_compounds.tsv.gz"
 chebi_compounds_filename = files_dir + "chebi_compounds.tsv"
 
+modelSeed_reac_url = "https://raw.githubusercontent.com/ModelSEED/ModelSEEDDatabase/master/Biochemistry/reactions.tsv"
+modelSeed_reac_aliases_url = "https://raw.githubusercontent.com/ModelSEED/ModelSEEDDatabase/master/Biochemistry/Aliases/Unique_ModelSEED_Reaction_Aliases.txt"
+modelSeed_reac_pathways_url = "https://raw.githubusercontent.com/ModelSEED/ModelSEEDDatabase/master/Biochemistry/Aliases/Unique_ModelSEED_Reaction_Pathways.txt"
+
+metaNetX_reactions_url = "https://ftp.vital-it.ch/databases/metanetx/MNXref/latest/reac_prop.tsv"
+metaNetX_reac_xref_url = "https://ftp.vital-it.ch/databases/metanetx/MNXref/latest/reac_xref.tsv"
+bigg_reactions_url = "http://bigg.ucsd.edu/static/namespace/bigg_models_reactions.txt"
+
+# Reactions
+ms_reac_filename = files_dir + "modelSeed_reactions.tsv"
+ms_reac_aliases_filename = files_dir + "modelSeed_reaction_aliases.txt"
+mx_reac_prop_filename = files_dir + "metaNetX_reac_prop.tsv"
+mx_reac_xref_filename = files_dir + "metaNetX_reac_xref.tsv"
+bigg_reactions_filename = files_dir + "bigg_models_reactions.txt"
+ms_reac_pathways_filename = files_dir + "modelSeed_reaction_pathways.txt"
+
 url_dictionary = {ms_met_filename: modelSeed_met_url,
                   ms_met_aliases_filename: modelSeed_met_aliases_url,
                   mx_chem_prop_filename: metaNetX_compounds_url,
                   mx_met_xref_filename: metaNetX_met_xref_url,
                   bigg_metabolites_filename: bigg_metabolites_url,
                   chebi_compounds_zipped_filename: chebi_compounds_url,
-                  chebi_compound_st_zipped_filename: chebi_compound_structure_url
+                  chebi_compound_st_zipped_filename: chebi_compound_structure_url,
+
+                  ms_reac_filename: modelSeed_reac_url,
+                  ms_reac_aliases_filename: modelSeed_reac_aliases_url,
+                  ms_reac_pathways_filename: modelSeed_reac_pathways_url,
+                  mx_reac_prop_filename: metaNetX_reactions_url,
+                  mx_reac_xref_filename: metaNetX_reac_xref_url,
+                  bigg_reactions_filename: bigg_reactions_url
                   }
+
 
 url_dictionary_chebi = {chebi_compounds_filename: chebi_compounds_zipped_filename,
                         chebi_compound_structure_filename: chebi_compound_st_zipped_filename
@@ -60,18 +84,24 @@ url_dictionary_chebi = {chebi_compounds_filename: chebi_compounds_zipped_filenam
 dict_any_met_id_to_fluxer_id = {}
 dict_fluxer_id_to_met_prop = {}
 list_primary_ids = set()
-last_fluxer_id = 0
+met_last_fluxer_id, reac_last_fluxer_id = 0, 0
 start_time = datetime.now().strftime("%Y%m%d_%HH%MM")
 database_names_dict = {'seed': set(), 'metanetx': set(), 'bigg': set(), 'kegg': set()}
 primary_dbs = ['seed', 'metanetx', 'bigg', 'kegg', 'chebi']
 met_prop_collected = {'seed': set(), 'metanetx': set(), 'bigg': set(), 'kegg': set(), 'chebi': set()}
+
+dict_any_reac_id_to_fluxer_id = {}
+dict_fluxer_id_to_reac_prop = {}
+database_names_dict_r = {"seed": set(), "metanetx": set(), "bigg": set()}
 
 
 def __log(message):
     dt_string = datetime.now().strftime("%Y%m%d_%H:%M:%S")
     log_line = dt_string + " " + message
     print(log_line)
-    log_file = open(log_dir + start_time + "_Metabolites_DatabasesDownloadLog.txt", "a")
+    # log_file = open(log_dir + start_time + "_Metabolites_DatabasesDownloadLog.txt", "a")
+    log_file = open(log_dir + start_time + "_DatabasesDownloadLog.txt", "a")
+
     log_file.write(log_line + "\n")
     log_file.close()
 
@@ -167,6 +197,21 @@ def __download_kegg_compounds(filename):
         dump(kegg_compounds_dict, kegg_file)
 
 
+def __process_reac_file(file_name, file_line_reader):
+    __log("Processing file " + file_name)
+    with open(file_name, "r") as file:
+        next(file)  # skip header
+        for line in file:
+            reac_properties = file_line_reader(line.strip().split('\t'))
+            if reac_properties is not None:
+                __append_reac_properties(reac_properties)
+
+    __log("Done processing file " + file_name)
+    __log(f"Number of reaction ids: {len(dict_any_reac_id_to_fluxer_id)}")
+    __log(f"Number of fluxer ids: {len(dict_fluxer_id_to_reac_prop)}")
+    __log("")
+
+
 def __process_met_file(file_name, file_line_reader):
     """
     Uses reader function to read lines of file and append informaiton to met properties dictionary.\n
@@ -229,9 +274,9 @@ def __append_met_properties(met_properties):
     fluxer_id = dict_any_met_id_to_fluxer_id.get(met_properties['ids'][0], maxsize)
 
     if fluxer_id == maxsize:
-        global last_fluxer_id
-        last_fluxer_id = last_fluxer_id + 1
-        fluxer_id = last_fluxer_id
+        global met_last_fluxer_id
+        met_last_fluxer_id = met_last_fluxer_id + 1
+        fluxer_id = met_last_fluxer_id
 
         dict_fluxer_id_to_met_prop[fluxer_id] = {'Name': [], 'ids': [], 'formula': [],
                                                  'mass': [], 'inchikey': [], 'xref_links': []}
@@ -245,6 +290,34 @@ def __append_met_properties(met_properties):
             for met_id in value:
                 dict_any_met_id_to_fluxer_id[met_id] = fluxer_id
         __add_values_to_property_list(fluxer_met_properties[key], value)
+
+
+def __append_reac_properties(reac_properties):
+
+    fluxer_id = min(fl_id for fl_id in (dict_any_reac_id_to_fluxer_id.get(reac_id, maxsize)
+                                        for reac_id in reac_properties['ids']))
+
+    if fluxer_id == maxsize:
+        global reac_last_fluxer_id
+        reac_last_fluxer_id = reac_last_fluxer_id + 1
+        fluxer_id = reac_last_fluxer_id
+        dict_fluxer_id_to_reac_prop[fluxer_id] = {'ids': [], 'Name': [],
+                                                  'EC_num': [], 'Pathways': [], 'xref_links': []}
+
+    fluxer_reac_properties = dict_fluxer_id_to_reac_prop[fluxer_id]
+
+    for key, value in reac_properties.items():
+        __add_values_to_property_list(fluxer_reac_properties[key], value)
+
+    for reac_id in reac_properties['ids']:
+        fluxer_reac_id_properties = dict_fluxer_id_to_reac_prop.get(reac_id)
+        dict_any_reac_id_to_fluxer_id[reac_id] = fluxer_id
+
+        if fluxer_reac_id_properties:
+            for key, value in fluxer_reac_id_properties.items():
+                __add_values_to_property_list(fluxer_reac_properties[key], value)
+
+            del dict_fluxer_id_to_reac_prop[reac_id]
 
 
 def __process_kegg_compounds(filename):
@@ -598,6 +671,166 @@ def __bigg_models_xref_reader(file_name):
     return xref_dict
 
 
+def __modelSeed_reactions_line_reader(line):
+    """
+    Reader function for collecting reaction info from modelseed file. \n
+    :param line: line from file
+    :return: dictionary mapping id to properties
+    """
+    ids = ["seed:" + line[0].lower()]
+
+    if line[19] != 'null':
+        ids += [('seed:' + ele) for ele in (line[19].lower().split(";"))]
+
+    database_names_dict_r["seed"] |= {"seed"}
+
+    return {'ids': ids,
+            'Name': [line[2]],
+            'EC_num': [line[13]]}
+
+
+def __modelSeed_reaction_aliases_line_reader(line):
+    """
+    Reader function for collecting identifiers from modelseed aliases file. \n
+    :param line: line from file
+    :return: dictionary with database ids
+    """
+    other_db = line[2].lower()
+    if other_db == 'metanetx.reaction':
+        database_names_dict_r["seed"] |= {"metanetx"}
+        return {'ids': ["seed:" + line[0].lower(), "metanetx:" + line[1].lower()]}
+
+    elif other_db in {'bigg', 'bigg1'}:
+        return None
+
+    elif other_db.startswith("i"):
+        return None
+
+    else:
+        database_names_dict_r["seed"] |= {other_db}
+        return {'ids': ["seed:" + line[0].lower(), other_db + ":" + line[1].lower()]}
+
+
+def __modelSeed_reaction_pathways_line_reader(line):
+    """
+    Reader function for collecting pathway information. \n
+    :param line: line from modelseed pathways file
+    :return: dictionary mapping seed id to pathway
+    """
+    return {'ids': ["seed:" + line[0].lower()],
+            'Pathways': [line[1]]}
+
+
+def __metanetx_reaction_prop_line_reader(line):
+    """
+    Reader function for cross references from metanetx reaction file. \n
+    :param file_name: line from file
+    :return: dictionary with properties from line
+    """
+
+    if line[0][0] != "M":
+        return None
+
+    [other_db, other_db_id] = line[2].lower().split(":")
+    if other_db == "mnx":
+        other_id = "metanetx:" + other_db_id
+    else:
+        if line[2].split(":")[0][-1] == "R":
+            other_db_name = other_db[:-1]
+        else:
+            other_db_name = other_db
+        other_id = other_db_name + ":" + other_db_id
+        database_names_dict_r["metanetx"] |= {other_db_name}
+
+    ids = ["metanetx:" + line[0].lower(), other_id]
+    database_names_dict_r["metanetx"] |= {"metanetx"}
+
+    if len(line) > 3:
+        return {'ids': ids,
+                'EC_num': [line[3]]}
+    else:
+        return {'ids': ids}
+
+
+def __metanetx_reaction_xref_line_reader(line):
+    """
+    Reader function for metanetx reaction cross reference file. \n
+    :param file_name: name of database file
+    :return: dictionary with properties from line
+        """
+    if (line[0][0] == "#") or (line[0][0:3] == "MNX") or (line[0][0:3] == "mnx") or (line[1] == "EMPTY"):
+        return None
+
+    [other_db, other_db_id] = line[0].lower().split(":")
+    if "." in other_db:
+        other_db_name = other_db.split(".")[0]
+        other_id = other_db_name + ":" + other_db_id
+    else:
+        if line[0].split(":")[0][-1] == "R":
+            other_db_name = other_db[:-1]
+        else:
+            other_db_name = other_db
+        other_id = other_db_name + ":" + other_db_id
+
+    ids = ["metanetx:" + line[1].lower(), other_id]
+
+    database_names_dict_r["metanetx"] |= {other_db_name}
+
+    return {'ids': ids}
+
+
+def __bigg_reactions_line_reader(line):
+    """
+    Line reader for reactions from BiGG database.\n
+    :param line: line in file
+    :return: dictionary with reaction information from line
+    """
+    ids = []
+    ec_nums = []
+    xref_links = []
+    names = []
+
+    ids += ['bigg:' + line[0].lower()]
+    ids += [('bigg:' + ele) for ele in (line[5].lower().split("; "))]
+
+    database_names_dict_r["bigg"] |= {"bigg"}
+
+    names += [line[1]]
+
+    if "http" in line[4]:
+        for link in line[4].split('; '):
+            link_part = link.lower().split('/')
+            other_db = link_part[3]
+            other_db_id = link_part[4]
+
+            if other_db == "ec-code":
+                ec_nums += [other_db_id]
+            else:
+                other_db_name = other_db.split('.')[0]
+                if other_db_name in {"seed", "metanetx"}:
+                    ids += [other_db_name + ':' + other_db_id]
+
+                    database_names_dict_r["bigg"] |= {other_db_name}
+
+            if ("seed" in link) or ("kegg" in link) or ("metanetx" in link):
+                xref_links += ["http" + link.split("http")[1]]
+
+    prop = {}
+    if ids:
+        prop["ids"] = ids
+    if ec_nums:
+        prop["EC_num"] = ec_nums
+    if xref_links:
+        prop["xref_links"] = xref_links
+    if names:
+        prop["Name"] = names
+
+    if prop:
+        return prop
+    else:
+        return None
+
+
 def __add_values_to_property_list(property_list, prop_value):
     invalid_values_list = ['\'\'', '\"\"', 'null', '-', '']
     for value in prop_value:
@@ -706,6 +939,7 @@ def __create_id_mapping_pickle():
     Mapping dictionary is serialized and saved.
     """
     global dict_any_met_id_to_fluxer_id, dict_fluxer_id_to_met_prop, database_names_dict, met_prop_collected
+    global database_names_dict_r, dict_any_reac_id_to_fluxer_id, dict_fluxer_id_to_reac_prop
 
     print("Creating directories")
     __create_directories()
@@ -735,6 +969,24 @@ def __create_id_mapping_pickle():
     __process_cross_ref_info(mx_chem_prop_filename, __metanetx_chem_prop_xref_reader)
     __process_cross_ref_info(bigg_metabolites_filename, __bigg_models_xref_reader)
 
+    __process_reac_file(ms_reac_filename, __modelSeed_reactions_line_reader)
+    __process_reac_file(ms_reac_pathways_filename, __modelSeed_reaction_pathways_line_reader)
+    __process_reac_file(mx_reac_prop_filename, __metanetx_reaction_prop_line_reader)
+    __process_reac_file(mx_reac_xref_filename, __metanetx_reaction_xref_line_reader)
+    __process_reac_file(bigg_reactions_filename, __bigg_reactions_line_reader)
+
+    __log("Cleaning reaction id mapping dictionary")
+    dict_any_reac_id_to_fluxer_id, dict_fluxer_id_to_reac_prop = __clean_id_mapping_dictionary(dict_any_reac_id_to_fluxer_id,
+                                                                                             dict_fluxer_id_to_reac_prop)
+
+    __log("Creating reaction id pickle")
+    with open(pickle_dir + 'reactionIdMapper.p', 'wb') as file:
+        dump(dict_any_reac_id_to_fluxer_id, file)
+
+    __log("Creating reaction info pickle")
+    with open(pickle_dir + 'reactionInfo.p', 'wb') as file:
+        dump(dict_fluxer_id_to_reac_prop, file)
+
     __log("Cleaning metabolite id dictionary")
     dict_any_met_id_to_fluxer_id, dict_fluxer_id_to_met_prop = __clean_id_mapping_dictionary(dict_any_met_id_to_fluxer_id,
                                                                                              dict_fluxer_id_to_met_prop)
@@ -742,9 +994,13 @@ def __create_id_mapping_pickle():
     with open(pickle_dir + 'metaboliteIdMapper.p', 'wb') as file:
         dump(dict_any_met_id_to_fluxer_id, file)
 
+    __log("Creating reaction info pickle")
+    with open(pickle_dir + 'metaboliteInfo.p', 'wb') as file:
+        dump(dict_fluxer_id_to_met_prop, file)
+
     toc = perf_counter()
     __log("")
     __log(f"All metabolites processed in {(toc - tic) / 60:0.3f} min")
     __log("")
-    print(f"New metabolite ID mapping table created.")
+    print(f"New ID mapping tables created.")
 

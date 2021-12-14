@@ -10,7 +10,7 @@ import cobra.io
 from cobra import Model, Reaction
 from pickle import load
 import os
-from . import __database_met_id_merger
+from . import __database_id_merger
 
 curr_dir = os.path.dirname(os.path.abspath(__file__))
 __fluxer_met_id_dict = {}
@@ -31,7 +31,7 @@ def __load_or_create_id_mapper():
         f.close()
     else:
         print("Building ID mapping table.")
-        __database_met_id_merger.__create_id_mapping_pickle()
+        __database_id_merger.__create_id_mapping_pickle()
 
 
 def __update_id_mapping_pickles():
@@ -39,7 +39,7 @@ def __update_id_mapping_pickles():
     Downloads latest versions of database files, merges the metabolite identifiers that have common
     properties and saves the mapping table as a pickle.
     """
-    __database_met_id_merger.__create_id_mapping_pickle()
+    __database_id_merger.__create_id_mapping_pickle()
 
 
 # returns fluxer identifier for a metabolite
