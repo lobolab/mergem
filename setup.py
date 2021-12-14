@@ -3,7 +3,7 @@ from setuptools import setup
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
-version = '0.1'
+version = '0.2'
 
 setup(name='mergem',
       version=version,
