@@ -7,6 +7,7 @@
     Copyright (c) Lobo Lab (https://lobolab.umbc.edu)
 """
 from . import __modelHandling
+from .__database_id_merger import __return_mapping_and_info_dicts
 import cobra
 
 
@@ -17,6 +18,16 @@ def update_id_mapper():
     cross-reference files and merges identifiers based on common properties.
     """
     __modelHandling.__update_id_mapping_pickles()
+
+
+# loads reaction and metabolite ID mapping and info dictionaries from pickles
+def get_mapping_and_info_dicts():
+    """
+    Returns dictionaries loaded from pickles. New ID mapping and info dictionaries and pickles are created
+    if they do not exist in data folder.
+    """
+    reaction_id_mapper, reaction_info, metabolite_id_mapper, metabolite_info = __return_mapping_and_info_dicts()
+    return reaction_id_mapper, reaction_info, metabolite_id_mapper, metabolite_info
 
 
 # merges models in a list to the template/first model

@@ -1004,3 +1004,27 @@ def __create_id_mapping_pickle():
     __log("")
     print(f"New ID mapping tables created.")
 
+
+def __return_mapping_and_info_dicts():
+    """
+    Checks if reaction and metabolite mapping pickles exist in data directory and loads dictionary
+    from pickles if they exist. Creates new pickles if they do not exist. \n
+    :return: dictionaries of reaction id mapper, reaction info, metabolite id mapper, metabolite info
+    """
+    pickle_filenames = ['reactionIdMapper.p', 'reactionInfo.p', 'metaboliteIdMapper.p', 'metaboliteInfo.p']
+    list_of_dictionaries = []
+
+    for filename in pickle_filenames:
+        if not os.path.exists(pickle_dir + filename):
+            global dict_any_reac_id_to_fluxer_id, dict_fluxer_id_to_reac_prop, dict_any_met_id_to_fluxer_id, \
+                dict_fluxer_id_to_met_prop
+            __create_id_mapping_pickle()
+            return [dict_any_reac_id_to_fluxer_id, dict_fluxer_id_to_reac_prop, dict_any_met_id_to_fluxer_id,
+                    dict_fluxer_id_to_met_prop]
+        else:
+            f = open(pickle_dir + filename, "rb")
+            mapping_or_info_dict = load(f)
+            list_of_dictionaries.append(mapping_or_info_dict)
+            f.close()
+
+    return list_of_dictionaries
