@@ -86,20 +86,16 @@ dict_fluxer_id_to_met_prop = {}
 list_primary_ids = set()
 met_last_fluxer_id, reac_last_fluxer_id = 0, 0
 start_time = datetime.now().strftime("%Y%m%d_%HH%MM")
-database_names_dict = {'seed': set(), 'metanetx': set(), 'bigg': set(), 'kegg': set()}
 primary_dbs = ['seed', 'metanetx', 'bigg', 'kegg', 'chebi']
-met_prop_collected = {'seed': set(), 'metanetx': set(), 'bigg': set(), 'kegg': set(), 'chebi': set()}
 
 dict_any_reac_id_to_fluxer_id = {}
 dict_fluxer_id_to_reac_prop = {}
-database_names_dict_r = {"seed": set(), "metanetx": set(), "bigg": set()}
 
 
 def __log(message):
     dt_string = datetime.now().strftime("%Y%m%d_%H:%M:%S")
     log_line = dt_string + " " + message
     print(log_line)
-    # log_file = open(log_dir + start_time + "_Metabolites_DatabasesDownloadLog.txt", "a")
     log_file = open(log_dir + start_time + "_DatabasesDownloadLog.txt", "a")
 
     log_file.write(log_line + "\n")
@@ -249,19 +245,17 @@ def __process_cross_ref_info(file_name, xref_line_reader):
     """
     __log("Processing file " + file_name)
 
+    global dict_any_met_id_to_fluxer_id, dict_fluxer_id_to_met_prop
     xref_dict = xref_line_reader(file_name)
 
-    for source_id, xref_set in xref_dict.items():
-        xref_list = list(xref_set)
-        source_fluxer_id = dict_any_met_id_to_fluxer_id[source_id]
-        source_id_prop = dict_fluxer_id_to_met_prop[source_fluxer_id]
-
+    for source_id, xref_list in xref_dict.items():
         for other_id in xref_list:
+            source_fluxer_id = dict_any_met_id_to_fluxer_id[source_id]
             if other_id in list_primary_ids:
                 __merge_identifiers(source_id, other_id)
             elif (other_id not in dict_any_met_id_to_fluxer_id) and (other_id.split(":", 1)[0] not in primary_dbs):
                 dict_any_met_id_to_fluxer_id[other_id] = source_fluxer_id
-                source_id_prop['ids'] += [other_id]
+                dict_fluxer_id_to_met_prop[source_fluxer_id]['ids'] += [other_id]
 
     __log("Done processing file " + file_name)
     __log(f"Number of metabolite ids: {len(dict_any_met_id_to_fluxer_id)}")
@@ -270,7 +264,7 @@ def __process_cross_ref_info(file_name, xref_line_reader):
 
 
 def __append_met_properties(met_properties):
-    global list_primary_ids
+    global list_primary_ids, dict_any_met_id_to_fluxer_id, dict_fluxer_id_to_met_prop
     fluxer_id = dict_any_met_id_to_fluxer_id.get(met_properties['ids'][0], maxsize)
 
     if fluxer_id == maxsize:
@@ -284,16 +278,20 @@ def __append_met_properties(met_properties):
     dict_any_met_id_to_fluxer_id[met_properties['ids'][0]] = fluxer_id
     fluxer_met_properties = dict_fluxer_id_to_met_prop[fluxer_id]
     list_primary_ids |= {db_id for db_id in met_properties['ids']}
+    fluxer_met_properties['ids'] += [met_properties['ids'][0]]
 
     for key, value in met_properties.items():
         if (key == 'ids') and (len(value) > 1):
             for met_id in value:
-                dict_any_met_id_to_fluxer_id[met_id] = fluxer_id
-        __add_values_to_property_list(fluxer_met_properties[key], value)
+                if met_id not in dict_any_met_id_to_fluxer_id:
+                    dict_any_met_id_to_fluxer_id[met_id] = fluxer_id
+                    fluxer_met_properties[key] += [met_id]
+        else:
+            __add_values_to_property_list(fluxer_met_properties[key], value)
 
 
 def __append_reac_properties(reac_properties):
-
+    global dict_any_reac_id_to_fluxer_id, dict_fluxer_id_to_reac_prop
     fluxer_id = min(fl_id for fl_id in (dict_any_reac_id_to_fluxer_id.get(reac_id, maxsize)
                                         for reac_id in reac_properties['ids']))
 
@@ -303,21 +301,22 @@ def __append_reac_properties(reac_properties):
         fluxer_id = reac_last_fluxer_id
         dict_fluxer_id_to_reac_prop[fluxer_id] = {'ids': [], 'Name': [],
                                                   'EC_num': [], 'Pathways': [], 'xref_links': []}
-
-    fluxer_reac_properties = dict_fluxer_id_to_reac_prop[fluxer_id]
-
+    unadded_db_ids = []
     for key, value in reac_properties.items():
-        __add_values_to_property_list(fluxer_reac_properties[key], value)
+        if key == 'ids':
+            for other_id in value:
+                other_fluxer_id = dict_any_reac_id_to_fluxer_id.get(other_id)
+                if other_fluxer_id is None:
+                    dict_any_reac_id_to_fluxer_id[other_id] = fluxer_id
+                    dict_fluxer_id_to_reac_prop[fluxer_id]['ids'] += [other_id]
+                else:
+                    unadded_db_ids.append(other_id)
+        else:
+            __add_values_to_property_list(dict_fluxer_id_to_reac_prop[fluxer_id][key], value)
 
-    for reac_id in reac_properties['ids']:
-        fluxer_reac_id_properties = dict_fluxer_id_to_reac_prop.get(reac_id)
-        dict_any_reac_id_to_fluxer_id[reac_id] = fluxer_id
-
-        if fluxer_reac_id_properties:
-            for key, value in fluxer_reac_id_properties.items():
-                __add_values_to_property_list(fluxer_reac_properties[key], value)
-
-            del dict_fluxer_id_to_reac_prop[reac_id]
+    for db_id in unadded_db_ids:
+        other_fluxer_id = dict_any_reac_id_to_fluxer_id.get(db_id)
+        __merge_identifiers(fluxer_id, other_fluxer_id, True)
 
 
 def __process_kegg_compounds(filename):
@@ -327,7 +326,7 @@ def __process_kegg_compounds(filename):
     kegg_file.close()
 
     for kegg_id, properties in kegg_compounds_dictionary.items():
-        ids = ["kegg:" + kegg_id]  # .lower()]
+        ids = ["kegg:" + kegg_id]
 
         if len(properties['chebi']) > 0:
             ids += [properties['chebi'][0]]
@@ -339,8 +338,6 @@ def __process_kegg_compounds(filename):
                          }
         __append_met_properties(property_dict)
 
-    met_prop_collected['kegg'] |= {'Name', 'formula', 'mass'}
-    database_names_dict['kegg'] |= {'chebi', 'kegg'}
     __log(f"Done processing file {filename}")
     __log(f"Number of metabolite ids: {len(dict_any_met_id_to_fluxer_id)}")
     __log(f"Number of fluxer ids: {len(dict_fluxer_id_to_met_prop)}")
@@ -358,8 +355,6 @@ def __chebi_compounds_inchi_reader(line):
                 'inchikey': [line[2]]
                 }
 
-    met_prop_collected['chebi'] |= {'inchikey'}
-
 
 def __chebi_compounds_names(line):
     """
@@ -372,8 +367,6 @@ def __chebi_compounds_names(line):
                 'Name': [line[5]]
                 }
 
-    met_prop_collected['chebi'] |= {'Name'}
-
 
 def __metanetx_chem_prop_line_reader(line):
     """
@@ -385,7 +378,6 @@ def __metanetx_chem_prop_line_reader(line):
         return None
 
     ids = ["metanetx:" + line[0]]
-    met_prop_collected['metanetx'] |= {'Name', 'formula', 'mass', 'inchikey'}
 
     if len(line) > 7:
         if len(line[5]) > 0:
@@ -394,7 +386,7 @@ def __metanetx_chem_prop_line_reader(line):
             mass = []
 
         if len(line[7]) > 0:
-            inchikey = [line[7].split('=', 1)[1]]  # .lower().split('=', 1)[1]]
+            inchikey = [line[7].split('=', 1)[1]]
         else:
             inchikey = []
 
@@ -443,12 +435,10 @@ def __metanetx_chem_prop_xref_reader(file_name):
                 other_id = other_db_name + ":" + other_db_id
 
             if other_id is not None:
-                database_names_dict['metanetx'] |= {other_db_name}
                 if source_id in xref_dict:
-                    xref_dict[source_id] |= {other_id}
+                    xref_dict[source_id] += [other_id]
                 else:
-                    xref_dict[source_id] = {other_id}
-    database_names_dict['metanetx'] |= {'metanetx'}
+                    xref_dict[source_id] = [other_id]
     return xref_dict
 
 
@@ -472,8 +462,8 @@ def __metanetx_chem_xref_reader(file_name):
                     or ("molecular entity" in line[2].lower()):
                 continue
 
-            source_id = "metanetx:" + line[1]  # .lower()
-            [other_db, other_db_id] = line[0].split(":", 1)  # .lower().split(":", 1)
+            source_id = "metanetx:" + line[1]
+            [other_db, other_db_id] = line[0].split(":", 1)
             other_id = None
 
             if "." in other_db:
@@ -484,12 +474,11 @@ def __metanetx_chem_xref_reader(file_name):
                                   "keggG", "reactomeM", "sabiorkM", "rheaP", "rheaG", "lipidmapsM", "metacycM"}:
                 other_id = other_db + ":" + other_db_id
 
-            if other_id is not None:  # and (other_db_name in primary_dbs):
-                database_names_dict['metanetx'] |= {other_db}
+            if other_id is not None:
                 if source_id in xref_dict:
-                    xref_dict[source_id] |= {other_id}
+                    xref_dict[source_id] += [other_id]
                 else:
-                    xref_dict[source_id] = {other_id}
+                    xref_dict[source_id] = [other_id]
 
     return xref_dict
 
@@ -500,8 +489,7 @@ def __modelseed_metabolites_line_reader(line):
     :param line: line from file
     :return: dictionary of metabolite information from line
     """
-    ids = ["seed:" + line[0]]  # .lower()]
-    met_prop_collected['seed'] |= {'Name', 'formula', 'mass', 'inchikey'}
+    ids = ["seed:" + line[0]]
 
     if (len(line[4]) > 0) and (line[4].lower() != 'none') and (line[4].lower() != 'null'):
         mass = [line[4]]
@@ -530,14 +518,13 @@ def __modelseed_metabolites_xref_reader(file_name):
             source_id = "seed:" + line[0]
             ids = []
             if line[10] != 'null':
-                ids += [('seed:' + ele) for ele in (line[10].split(";"))]  # .lower().split(";"))]
+                ids += [('seed:' + ele) for ele in (line[10].split(";"))]
 
             if len(ids) > 0:
                 if source_id in xref_dict:
-                    xref_dict[source_id] |= {seed_id for seed_id in ids}
+                    xref_dict[source_id] += [seed_id for seed_id in ids]
                 else:
-                    xref_dict[source_id] = {seed_id for seed_id in ids}
-    database_names_dict['seed'] |= {'seed'}
+                    xref_dict[source_id] = [seed_id for seed_id in ids]
     return xref_dict
 
 
@@ -558,21 +545,19 @@ def __modelseed_met_aliases_reader(file_name):
 
             if other_db == 'metanetx.chemical':
                 other_db_name = 'metanetx'
-                database_names_dict['seed'] |= {other_db_name}
-                other_id = other_db_name + ":" + line[1]  # .lower()
+                other_id = other_db_name + ":" + line[1]
 
             elif other_db in primary_dbs:
                 other_db_name = other_db
-                database_names_dict['seed'] |= {other_db_name}
-                other_id = other_db_name + ":" + line[1]  #.lower()
+                other_id = other_db_name + ":" + line[1]
 
             else:
                 continue
 
             if source_id in xref_dict:
-                xref_dict[source_id] |= {other_id}
+                xref_dict[source_id] += [other_id]
             else:
-                xref_dict[source_id] = {other_id}
+                xref_dict[source_id] = [other_id]
 
     return xref_dict
 
@@ -590,14 +575,11 @@ def __bigg_metabolites_line_reader(line):
     inchikeys = []
     xref_links = []
     names = []
-    met_prop_collected['bigg'] |= {'Name', 'inchikey', 'xref_links'}
 
     ids += ['bigg:' + line[1]]
 
     if len(line) > 2:
         names += [line[2]]
-
-    database_names_dict['bigg'] |= {'bigg'}
 
     if (len(line) > 4) and "http" in line[4]:
         for link in line[4].split('; '):
@@ -656,18 +638,16 @@ def __bigg_models_xref_reader(file_name):
                     if other_db == 'inchikey':
                         continue
                     elif other_db == 'chebi':
-                        database_names_dict['bigg'] |= {'chebi'}
                         ids += [other_db_id.lower()]
                     else:
                         other_db_name = other_db.split('.')[0].lower()
-                        database_names_dict['bigg'] |= {other_db_name}
                         if other_db_name in primary_dbs:  # get only primary identifiers from bigg - incorrect chebi
                             ids += [other_db_name + ':' + other_db_id]
 
             if source_id in xref_dict:
-                xref_dict[source_id] |= {db_id for db_id in ids}
+                xref_dict[source_id] += [db_id for db_id in ids]
             else:
-                xref_dict[source_id] = {db_id for db_id in ids}
+                xref_dict[source_id] = [db_id for db_id in ids]
     return xref_dict
 
 
@@ -677,12 +657,10 @@ def __modelSeed_reactions_line_reader(line):
     :param line: line from file
     :return: dictionary mapping id to properties
     """
-    ids = ["seed:" + line[0].lower()]
+    ids = ["seed:" + line[0]]
 
     if line[19] != 'null':
-        ids += [('seed:' + ele) for ele in (line[19].lower().split(";"))]
-
-    database_names_dict_r["seed"] |= {"seed"}
+        ids += [('seed:' + ele) for ele in (line[19].split(";"))]
 
     return {'ids': ids,
             'Name': [line[2]],
@@ -697,8 +675,7 @@ def __modelSeed_reaction_aliases_line_reader(line):
     """
     other_db = line[2].lower()
     if other_db == 'metanetx.reaction':
-        database_names_dict_r["seed"] |= {"metanetx"}
-        return {'ids': ["seed:" + line[0].lower(), "metanetx:" + line[1].lower()]}
+        return {'ids': ["seed:" + line[0], "metanetx:" + line[1]]}
 
     elif other_db in {'bigg', 'bigg1'}:
         return None
@@ -707,8 +684,7 @@ def __modelSeed_reaction_aliases_line_reader(line):
         return None
 
     else:
-        database_names_dict_r["seed"] |= {other_db}
-        return {'ids': ["seed:" + line[0].lower(), other_db + ":" + line[1].lower()]}
+        return {'ids': ["seed:" + line[0], other_db + ":" + line[1]]}
 
 
 def __modelSeed_reaction_pathways_line_reader(line):
@@ -717,7 +693,7 @@ def __modelSeed_reaction_pathways_line_reader(line):
     :param line: line from modelseed pathways file
     :return: dictionary mapping seed id to pathway
     """
-    return {'ids': ["seed:" + line[0].lower()],
+    return {'ids': ["seed:" + line[0]],
             'Pathways': [line[1]]}
 
 
@@ -731,19 +707,17 @@ def __metanetx_reaction_prop_line_reader(line):
     if line[0][0] != "M":
         return None
 
-    [other_db, other_db_id] = line[2].lower().split(":")
-    if other_db == "mnx":
+    [other_db, other_db_id] = line[2].split(":")
+    if other_db.lower() == "mnx":
         other_id = "metanetx:" + other_db_id
     else:
         if line[2].split(":")[0][-1] == "R":
-            other_db_name = other_db[:-1]
+            other_db_name = other_db[:-1].lower()
         else:
             other_db_name = other_db
         other_id = other_db_name + ":" + other_db_id
-        database_names_dict_r["metanetx"] |= {other_db_name}
 
-    ids = ["metanetx:" + line[0].lower(), other_id]
-    database_names_dict_r["metanetx"] |= {"metanetx"}
+    ids = ["metanetx:" + line[0], other_id]
 
     if len(line) > 3:
         return {'ids': ids,
@@ -761,20 +735,18 @@ def __metanetx_reaction_xref_line_reader(line):
     if (line[0][0] == "#") or (line[0][0:3] == "MNX") or (line[0][0:3] == "mnx") or (line[1] == "EMPTY"):
         return None
 
-    [other_db, other_db_id] = line[0].lower().split(":")
+    [other_db, other_db_id] = line[0].split(":")
     if "." in other_db:
-        other_db_name = other_db.split(".")[0]
+        other_db_name = other_db.split(".")[0].lower()
         other_id = other_db_name + ":" + other_db_id
     else:
         if line[0].split(":")[0][-1] == "R":
-            other_db_name = other_db[:-1]
+            other_db_name = other_db[:-1].lower()
         else:
             other_db_name = other_db
         other_id = other_db_name + ":" + other_db_id
 
-    ids = ["metanetx:" + line[1].lower(), other_id]
-
-    database_names_dict_r["metanetx"] |= {other_db_name}
+    ids = ["metanetx:" + line[1], other_id]
 
     return {'ids': ids}
 
@@ -791,28 +763,25 @@ def __bigg_reactions_line_reader(line):
     names = []
 
     ids += ['bigg:' + line[0].lower()]
-    ids += [('bigg:' + ele) for ele in (line[5].lower().split("; "))]
-
-    database_names_dict_r["bigg"] |= {"bigg"}
+    ids += [('bigg:' + ele) for ele in (line[5].split("; "))]
 
     names += [line[1]]
 
     if "http" in line[4]:
         for link in line[4].split('; '):
-            link_part = link.lower().split('/')
+            link_part = link.split('/')
             other_db = link_part[3]
             other_db_id = link_part[4]
 
-            if other_db == "ec-code":
+            if other_db.lower() == "ec-code":
                 ec_nums += [other_db_id]
             else:
-                other_db_name = other_db.split('.')[0]
+                other_db_name = other_db.split('.')[0].lower()
                 if other_db_name in {"seed", "metanetx"}:
                     ids += [other_db_name + ':' + other_db_id]
 
-                    database_names_dict_r["bigg"] |= {other_db_name}
-
-            if ("seed" in link) or ("kegg" in link) or ("metanetx" in link):
+            link_lower = link.lower()
+            if ("seed" in link_lower) or ("kegg" in link_lower) or ("metanetx" in link_lower):
                 xref_links += ["http" + link.split("http")[1]]
 
     prop = {}
@@ -838,98 +807,136 @@ def __add_values_to_property_list(property_list, prop_value):
             property_list.append(value)
 
 
-def __merge_identifiers(source_id, other_id):
+def __merge_identifiers(source_id, other_id, for_reac=False):
     """
     Merges the two met IDs into lowest fluxer ID only if at least two properties match.
     :param source_id: primary metabolite ID from database being processed
     :param other_id: cross referenced metabolite ID to be mapped to primary met ID
     """
-    source_fluxer_id = dict_any_met_id_to_fluxer_id.get(source_id)
-    source_id_properties = dict_fluxer_id_to_met_prop[source_fluxer_id]
+    global dict_fluxer_id_to_met_prop, dict_any_met_id_to_fluxer_id, \
+        dict_fluxer_id_to_reac_prop, dict_any_reac_id_to_fluxer_id
 
-    matched_properties = []
-    check_prop = []
-    other_fluxer_id = dict_any_met_id_to_fluxer_id.get(other_id)
+    if for_reac:
+        source_fluxer_id = source_id
+        other_fluxer_id = other_id
+        id_mapper = dict_any_reac_id_to_fluxer_id
+        prop_mapper = dict_fluxer_id_to_reac_prop
+
+    else:
+        source_fluxer_id = dict_any_met_id_to_fluxer_id.get(source_id)
+        other_fluxer_id = dict_any_met_id_to_fluxer_id.get(other_id)
+        id_mapper = dict_any_met_id_to_fluxer_id
+        prop_mapper = dict_fluxer_id_to_met_prop
+
+    source_id_properties = prop_mapper[source_fluxer_id]
+    other_properties = prop_mapper[other_fluxer_id]
 
     if other_fluxer_id != source_fluxer_id:
-        other_properties = dict_fluxer_id_to_met_prop[other_fluxer_id]
-
-        check_prop += [prop for prop in ['mass', 'inchikey', 'Name', 'formula']
-                       if len(other_properties[prop]) > 0 if len(source_id_properties[prop]) > 0]
-
-        property_mismatch = False
-        for prop in check_prop:
-            if prop == 'mass':
-                if abs(float(other_properties[prop][0]) - float(source_id_properties[prop][0])) < 0.5:
-                    matched_properties.append(prop)
-                else:
-                    property_mismatch = True
-            else:
-                if prop != 'inchikey':
-                    for string_prop in other_properties[prop]:
-                        if string_prop.lower() in \
-                                (source_string_prop.lower() for source_string_prop in source_id_properties[prop]):
-                            matched_properties.append(prop)
-                            break
-                else:
-                    if other_properties[prop][0].lower() == source_id_properties[prop][0].lower():
-                        matched_properties.append(prop)
-                    else:
-                        property_mismatch = True
-            if (len(matched_properties) > 1) or property_mismatch:
-                break
+        matched_properties = __check_properties(source_id_properties, other_properties, for_reac)
 
         if len(matched_properties) > 1:
-            minimum_fluxer_id = min([source_fluxer_id, other_fluxer_id])
-
-            if minimum_fluxer_id == source_fluxer_id:
+            if source_fluxer_id < other_fluxer_id:
                 for xref_id in other_properties['ids']:
-                    dict_any_met_id_to_fluxer_id[xref_id] = minimum_fluxer_id
+                    id_mapper[xref_id] = source_fluxer_id
                 for key, value in other_properties.items():
                     __add_values_to_property_list(source_id_properties[key], value)
-                del other_properties
+
+                del prop_mapper[other_fluxer_id]
 
             else:
                 for xref_id in source_id_properties['ids']:
-                    dict_any_met_id_to_fluxer_id[xref_id] = minimum_fluxer_id
+                    id_mapper[xref_id] = other_fluxer_id
                 for key, value in source_id_properties.items():
                     __add_values_to_property_list(other_properties[key], value)
-                del source_id_properties
+
+                del prop_mapper[source_fluxer_id]
 
 
-def __clean_id_mapping_dictionary(id_dictionary, info_dictionary):
+def __check_properties(source_prop, other_prop, for_reac=False):
+    matched_properties = []
+    check_prop = []
+    if not for_reac:
+        check_prop += [prop for prop in ['mass', 'inchikey', 'Name', 'formula']
+                       if len(other_prop[prop]) > 0 if len(source_prop[prop]) > 0]
+    else:
+        check_prop += [prop for prop in ['Name', 'EC_num', 'ids']
+                       if len(other_prop[prop]) > 0 if len(source_prop[prop]) > 0]
+
+    property_mismatch = False
+
+    for prop in check_prop:
+        if prop == 'mass':
+            if abs(float(other_prop[prop][0]) - float(source_prop[prop][0])) < 1:
+                matched_properties.append(prop)
+            else:
+                property_mismatch = True
+        else:
+            if prop == 'inchikey':
+                if other_prop[prop][0].lower() == source_prop[prop][0].lower():
+                    matched_properties.append(prop)
+                else:
+                    property_mismatch = True
+            elif prop in {'Name', 'formula'}:
+                for string_prop in other_prop[prop]:
+                    if string_prop.lower() in \
+                            (source_string_prop.lower() for source_string_prop in source_prop[prop]):
+                        matched_properties.append(prop)
+                        break
+
+            elif prop in {'EC_num', 'ids'}:
+                if len(set(source_prop[prop]).intersection(set(other_prop[prop]))) > 0:
+                    matched_properties.append(prop)
+
+        if (len(matched_properties) > 1) or property_mismatch:
+            break
+
+    return matched_properties
+
+
+def __clean_id_mapping_dictionary(id_dictionary, info_dictionary, for_reac=False):
     dict_copy_id_converter = {}
-    dict_copy_met_info = {}
+    dict_copy_info = {}
     db_name_dict = {}
-    db_preference = {'kegg': 0, 'chebi': 1, 'metanetx': 2, 'bigg': 3, 'seed': 4, 'sabiork': 5}
+    if for_reac:
+        db_preference = {'metanetx': 0, 'seed': 1, 'bigg': 2, 'kegg': 3, 'sabiork': 4, 'metacyc': 5}
+    else:
+        db_preference = {'kegg': 0, 'chebi': 1, 'metanetx': 2, 'bigg': 3, 'seed': 4, 'sabiork': 5}
+
     for db_id, fl_id in id_dictionary.items():
         [db_name, new_key] = db_id.split(":", 1)
         conflict_fl_id = dict_copy_id_converter.get(new_key)
         if conflict_fl_id:
-            if db_preference.get(db_name, maxsize) > db_preference.get(db_name_dict[conflict_fl_id], maxsize):
+            if db_preference.get(db_name, maxsize) > db_preference.get(db_name_dict[new_key], maxsize):
+                __remove_conflicting_id(new_key, fl_id, info_dictionary)
                 fl_id = conflict_fl_id
             else:
-                continue
+                __remove_conflicting_id(new_key, conflict_fl_id, info_dictionary)
+
         dict_copy_id_converter[new_key] = fl_id
-        if db_name_dict.get(fl_id) is None:
-            db_name_dict[fl_id] = db_name
+        if new_key not in db_name_dict:
+            db_name_dict[new_key] = db_name
 
     for fluxer_id in dict_copy_id_converter.values():
-        dict_copy_met_info[fluxer_id] = info_dictionary[fluxer_id]
+        dict_copy_info[fluxer_id] = info_dictionary[fluxer_id].copy()
 
-    __log(f"Number of metabolite ids: {len(dict_copy_id_converter)}")
-    __log(f"Number of fluxer ids: {len(dict_copy_met_info)}")
+    __log(f"Number of database ids: {len(dict_copy_id_converter)}")
+    __log(f"Number of fluxer ids: {len(dict_copy_info)}")
     __log("")
 
-    return dict_copy_id_converter, dict_copy_met_info
+    return dict_copy_id_converter, dict_copy_info
 
 
-def __dict_values_set_to_list(dict_db_names_table):
-    cleaned_dict = {}
-    for source_db, mapped_dbs in dict_db_names_table.items():
-        cleaned_dict[source_db] = list(mapped_dbs)
+def __remove_conflicting_id(db_id, fl_id_to_update, info_dict):
+    other_db_id = []
+    if len(info_dict[fl_id_to_update]['ids']) > 1:
+        for other_id in info_dict[fl_id_to_update]['ids']:
+            if db_id == other_id.split(":", 1)[1]:
+                other_db_id.append(other_id)
+        for d_id in other_db_id:
+            info_dict[fl_id_to_update]['ids'].remove(d_id)
 
-    return cleaned_dict
+    if len(info_dict[fl_id_to_update]['ids']) == 0:
+        del info_dict[fl_id_to_update]
 
 
 # Main program
@@ -938,8 +945,8 @@ def __create_id_mapping_pickle():
     Main function that downloads database files and processes them to merge identifiers into a mapping dictionary.
     Mapping dictionary is serialized and saved.
     """
-    global dict_any_met_id_to_fluxer_id, dict_fluxer_id_to_met_prop, database_names_dict, met_prop_collected
-    global database_names_dict_r, dict_any_reac_id_to_fluxer_id, dict_fluxer_id_to_reac_prop
+    global dict_any_met_id_to_fluxer_id, dict_fluxer_id_to_met_prop, \
+        dict_any_reac_id_to_fluxer_id, dict_fluxer_id_to_reac_prop
 
     print("Creating directories")
     __create_directories()
@@ -977,7 +984,8 @@ def __create_id_mapping_pickle():
 
     __log("Cleaning reaction id mapping dictionary")
     dict_any_reac_id_to_fluxer_id, dict_fluxer_id_to_reac_prop = __clean_id_mapping_dictionary(dict_any_reac_id_to_fluxer_id,
-                                                                                             dict_fluxer_id_to_reac_prop)
+                                                                                               dict_fluxer_id_to_reac_prop,
+                                                                                               for_reac=True)
 
     __log("Creating reaction id pickle")
     with open(pickle_dir + 'reactionIdMapper.p', 'wb') as file:
@@ -990,17 +998,18 @@ def __create_id_mapping_pickle():
     __log("Cleaning metabolite id dictionary")
     dict_any_met_id_to_fluxer_id, dict_fluxer_id_to_met_prop = __clean_id_mapping_dictionary(dict_any_met_id_to_fluxer_id,
                                                                                              dict_fluxer_id_to_met_prop)
+
     __log("Creating metabolite id pickle")
     with open(pickle_dir + 'metaboliteIdMapper.p', 'wb') as file:
         dump(dict_any_met_id_to_fluxer_id, file)
 
-    __log("Creating reaction info pickle")
+    __log("Creating metabolite info pickle")
     with open(pickle_dir + 'metaboliteInfo.p', 'wb') as file:
         dump(dict_fluxer_id_to_met_prop, file)
 
     toc = perf_counter()
     __log("")
-    __log(f"All metabolites processed in {(toc - tic) / 60:0.3f} min")
+    __log(f"All database identifiers processed in {(toc - tic) / 60:0.3f} min")
     __log("")
     print(f"New ID mapping tables created.")
 
