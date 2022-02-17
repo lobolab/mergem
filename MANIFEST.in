@@ -1,2 +1,2 @@
 include README.md
-include mergem/data/metaboliteIdMapper.p
+include mergem/data/*.p
