@@ -197,7 +197,7 @@ def merge(list_of_inputs, set_objective='merge'):
                                                                 list_of_objective_reactions, set_objective)
     merged_model_id = merged_model_id[:-1]
     merged_model = __modelHandling.__convert_template_to_merged_model(template_model, merged_model_id,
-                                                                      met_model_id_dict, met_model_id_dict)
+                                                                      met_model_id_dict)
 
     merged_model.repair()
 
