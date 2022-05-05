@@ -13,7 +13,7 @@ import os
 from . import __database_id_merger
 
 curr_dir = os.path.dirname(os.path.abspath(__file__))
-__fluxer_met_id_dict = {}
+__fluxer_met_id_dict, __fluxer_met_info_dict = {}, {}
 
 
 # To convert model met ID to fluxer ID
@@ -22,16 +22,26 @@ def __load_or_create_id_mapper():
     Checks if metabolite id mapper exists in current directory, else downloads the latest database files,
     merges the database identifiers based on common properties and saves the mapping table as a pickle.
     """
-    global __fluxer_met_id_dict
+    global __fluxer_met_id_dict, __fluxer_met_info_dict
     met_conv_file = "metaboliteIdMapper.p"
-    pickle_path = os.path.join(curr_dir, "data", met_conv_file)
-    if os.path.exists(pickle_path):
-        f = open(pickle_path, "rb")
+    met_info_file = 'metaboliteInfo.p'
+    met_conv_pickle_path = os.path.join(curr_dir, "data", met_conv_file)
+    met_info_pickle_path = os.path.join(curr_dir, "data", met_info_file)
+
+    if (os.path.exists(met_conv_pickle_path)) and (os.path.exists(met_info_pickle_path)):
+        f = open(met_conv_pickle_path, "rb")
         __fluxer_met_id_dict = load(f)
         f.close()
+
+        f = open(met_info_pickle_path, "rb")
+        __fluxer_met_info_dict = load(f)
+        f.close()
+
     else:
-        print("Building ID mapping table.")
+        print("Building ID mapping and metabolite Info table.")
         __database_id_merger.__create_id_mapping_pickle()
+        __fluxer_met_id_dict = __database_id_merger.__return_mapping_and_info_dicts()[2]
+        __fluxer_met_info_dict = __database_id_merger.__return_mapping_and_info_dicts()[3]
 
 
 def __update_id_mapping_pickles():
@@ -49,10 +59,13 @@ def __get_fluxer_id(db_id):
     :param db_id: External database id from model
     :return: metabolite fluxer_id, if exists else None
     """
-    split_db_id = db_id.rsplit("_", 1)[0]
     fluxer_id = __fluxer_met_id_dict.get(db_id)
 
     if fluxer_id is None:
+        if '@' in db_id:
+            split_db_id = db_id.rsplit('@', 1)[0]
+        else:
+            split_db_id = db_id.rsplit("_", 1)[0]
         fluxer_id = __fluxer_met_id_dict.get(split_db_id)
 
     return fluxer_id
@@ -65,17 +78,17 @@ def __get_localization(id_or_model_localization):
     :param id_or_model_localization: cellular localization of entity in model
     :return: single letter cellular localization
     """
-    localization_dict = {'p': 'p', 'p0': 'p', 'periplasm': 'p', 'periplasm_0': 'p',
-                         'c': 'c', 'c0': 'c', 'cytosol': 'c', 'cytosol_0': 'c', 'cytoplasm': 'c',
+    localization_dict = {'p': 'p', 'p0': 'p', 'periplasm': 'p', 'periplasm_0': 'p', 'mnxc19': 'p',
+                         'c': 'c', 'c0': 'c', 'cytosol': 'c', 'cytosol_0': 'c', 'cytoplasm': 'c', 'mnxc3': 'c',
                          'cytoplasm_0': 'c',
                          'e': 'e', 'e0': 'e', 'extracellular': 'e', 'extracellular_0': 'e',
-                         'extracellular space': 'e',
-                         'm': 'm', 'mitochondria': 'm', 'mitochondria_0': 'm',
+                         'extracellular space': 'e', 'mnxc2': 'e',
+                         'm': 'm', 'mitochondria': 'm', 'mitochondria_0': 'm', 'mnxc4': 'm',
                          'b': 'b', 'boundary': 'b',
-                         'x': 'p/glyoxysome',
-                         'h': 'h', 'choloroplast': 'h',
-                         'v': 'v', 'vacuole': 'v',
-                         'n': 'n', 'nucleus': 'n'}
+                         'x': 'p/glyoxysome', 'mnxc24': 'p/glyoxysome', 'mnxc13': 'p/glyoxysome',
+                         'h': 'h', 'choloroplast': 'h', 'mnxc8': 'h',
+                         'v': 'v', 'vacuole': 'v', 'mnxc9': 'v',
+                         'n': 'n', 'nucleus': 'n', 'mnxc6': 'n'}
 
     localization = localization_dict.get(id_or_model_localization.lower(), '')
 
@@ -91,20 +104,26 @@ def __create_reaction_key(reaction, reverse=False):
     :param reverse: reverse the reaction before creating key
     :return: frozen set of pairs of IDs of participating metabolite and their stoichiometric coefficients
     """
-    reac_metabolite_set = set()  # sets are unordered -> easy to compare to one another than tuple
-    for metabolite in reaction.metabolites:
-        if reverse:
-            stoichiometric_coeff = - reaction.metabolites[metabolite]
-        else:
-            stoichiometric_coeff = reaction.metabolites[metabolite]
+    reac_metabolite_set = set()
+    reac_rev_met_set = set()
+    for reactant in reaction.reactants:
+        if ('fluxer_78_' not in reactant.id) and (reactant.id[-1] != 'b') and (reactant.name != "PMF"):
+            metabolite_set = (reactant.id, -1)
+            rev_met_set = (reactant.id, 1)
+            reac_metabolite_set.add(metabolite_set)
+            reac_rev_met_set.add(rev_met_set)
 
-        metabolite_set = (metabolite.id, stoichiometric_coeff)  # since models are already translated
-        reac_metabolite_set.add(metabolite_set)
+    for product in reaction.products:
+        if ('fluxer_78_' not in product.id) and (product.id[-1] != 'b') and (product.name != "PMF"):
+            metabolite_set = (product.id, 1)
+            rev_met_set = (product.id, -1)
+            reac_metabolite_set.add(metabolite_set)
+            reac_rev_met_set.add(rev_met_set)
 
     reac_metabolite_set = frozenset(reac_metabolite_set)
+    reac_rev_met_set = frozenset(reac_rev_met_set)
 
-    return reac_metabolite_set
-
+    return reac_metabolite_set, reac_rev_met_set
 
 # returns a metabolite id in fluxer namespace with cellular localization
 def __create_fluxer_metabolite_id(metabolite):
@@ -118,7 +137,11 @@ def __create_fluxer_metabolite_id(metabolite):
 
     if met_fluxer_id is not None:
         if (met_compartment == '') & ('_' in metabolite.id):
-            met_compartment = __get_localization(metabolite.id.rsplit("_", 1)[1])
+            if '@' in metabolite.id:
+                met_compartment = __get_localization(metabolite.id.rsplit('@', 1)[1])
+            else:
+                met_compartment = __get_localization(metabolite.id.rsplit("_", 1)[1])
+
             if met_compartment != '':
                 met_id = "fluxer_" + str(met_fluxer_id) + "_" + met_compartment
                 return met_id
@@ -199,13 +222,21 @@ def __convert_template_to_merged_model(model, merged_model_id, dict_met_id_conv)
     :param dict_met_id_conv: dictionary mapping fluxer ids to original model ids
     :return: merged model in original model id namespace
     """
+    global __fluxer_met_info_dict
     merged_model = Model(merged_model_id)
 
     for reaction in model.reactions:
         reaction_copy = reaction.copy()
         for metabolite in reaction_copy.metabolites:
             if "fluxer" in metabolite.id:  # Only revert fluxer IDs
-                metabolite.id = dict_met_id_conv[metabolite.id][0]  # converted_mets[metabolite.id]
+                new_met_id = dict_met_id_conv[metabolite.id][0]
+                if new_met_id not in reaction_copy.metabolites:
+                    metabolite.id  = new_met_id
+                else:
+                    uniq_ids = [model_id for model_id in dict_met_id_conv[metabolite.id]
+                                if model.metabolites.get_by_id(model_id) not in reaction.metabolites]
+                    if len(uniq_ids) > 0:
+                        metabolite.id = uniq_ids[0]
         merged_model.add_reactions([reaction_copy])
 
     merged_model.objective = model.objective
@@ -295,7 +326,7 @@ def __export_merged_model(cobra_model, file_name):
         raise IOError('Unable to save merged model. Check file format {}'.format(file_name))
 
 
-def __calculate_jaccard_distance(num_reference, num_merged):
+def __calculate_jaccard_distance(num_reference, num_merged, num_unique):
     """
     Calculates jaccard distance given the number of entities in reference and
     number of entities common between reference and other set.
@@ -303,7 +334,7 @@ def __calculate_jaccard_distance(num_reference, num_merged):
     :param num_merged: number of entities (met/reacs) merged
     :return: jaccard distance of model from reference model.
     """
-    jaccard_distance = round(float(1 - num_merged/num_reference), 2)
+    jaccard_distance = round(float(1 - num_merged/(num_unique + num_reference + num_merged)), 2)
     return jaccard_distance
 
 
