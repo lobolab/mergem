@@ -59,60 +59,54 @@ def merge(list_of_inputs, set_objective='merge'):
     met_source_dict, reac_source_dict, met_model_id_dict = {}, {}, {}
     merged_model_reactions = {}
     total_mets_merged, total_reacs_merged = 0, 0
-    fluxer_ids_created = {}
     model_jaccard_distances = []
-    ref_model_mets = set()
+    ref_model_mets = 0
     met_and_reac_sources = []
 
     merged_model_id = 'merged_'
     template_model = cobra.Model(merged_model_id)
     num_ref_model_reacs = len(list_of_models[0].reactions)
     __modelHandling.__load_or_create_id_mapper()
-    for model_index in range(0, len(list_of_models)):
+    cleaned_models = []
+
+    # model 'cleanup'
+    for model in list_of_models:
+        model_mets = {}
+        update_reactions = []
+        for met in model.metabolites:
+            met_fluxer_id = __modelHandling.__create_fluxer_metabolite_id(met)
+            if met_fluxer_id not in model_mets:
+                model_mets[met_fluxer_id] = met.copy()
+            else:
+                existing_met = model.metabolites.get_by_id(model_mets[met_fluxer_id].id)
+                if existing_met.reactions != met.reactions:
+                    for reaction in met.reactions:
+                        if met in reaction.metabolites:
+                            update_reactions += [(reaction.id, existing_met.id, met.id)]
+
+        for reaction_id, new_met_id, old_met_id in update_reactions:
+            reaction = model.reactions.get_by_id(reaction_id)
+            reaction_copy = reaction.copy()
+            for met in reaction_copy.metabolites:
+                if met.id == old_met_id:
+                    st_coeff = reaction_copy.metabolites[met]
+                    reaction.add_metabolites({new_met_id: st_coeff})
+                    reaction.add_metabolites({met.id: -st_coeff})
+
+        model.repair()
+        cleaned_models.append(model)
+
+    for model_index in range(0, len(cleaned_models)):
         model = list_of_models[model_index]
         merged_model_id += model.id + "_"
         list_model_objectives = []
         num_met_merged = 0
         num_reac_merged = 0
-
-        for metabolite in model.metabolites:
-            met_fluxer_id = __modelHandling.__create_fluxer_metabolite_id(metabolite)
-            met_copy = metabolite.copy()
-
-            if met_fluxer_id is None:
-                curr_id = metabolite.id
-            else:
-                fluxer_ids_created[metabolite.id] = met_fluxer_id
-                curr_id = met_fluxer_id
-
-            if curr_id in met_model_id_dict:
-                met_model_id_dict[curr_id] += [metabolite.id]
-                met_source_dict[curr_id] |= {model_index}
-            else:
-                met_model_id_dict[curr_id] = [metabolite.id]
-                met_copy.id = curr_id
-                template_model.add_metabolites(met_copy)
-                met_source_dict[curr_id] = {model_index}
-
-            if model_index == 0:
-                ref_model_mets |= {curr_id}
-            else:
-                if curr_id in ref_model_mets:
-                    num_met_merged += 1
-                    total_mets_merged += 1
+        unique_to_current_model, unique_to_current_model_r = 0, 0
+        met_counted = set()
 
         for reaction in model.reactions:
-            for reaction_met in reaction.metabolites:
-                new_met_id = fluxer_ids_created.get(reaction_met.id)
-                if (new_met_id not in model.metabolites) and (new_met_id is not None):
-                    reaction_met.id = new_met_id
-
-                elif new_met_id in model.metabolites:
-                    st_coeff = reaction.metabolites[reaction_met]
-                    reaction.add_metabolites({new_met_id: st_coeff})
-                    reaction.add_metabolites({reaction_met: 0})
-
-            if reaction.id in str(model.objective):
+            if reaction.id in str(model.objective): # processing objective reactions
                 list_model_objectives.append(reaction)
                 if reaction.id in reac_source_dict:
                     reac_source_dict[reaction.id] |= {model_index}
@@ -120,35 +114,69 @@ def merge(list_of_inputs, set_objective='merge'):
                     reac_source_dict[reaction.id] = {model_index}
 
             else:
-                reaction_key = __modelHandling.__create_reaction_key(reaction, False)
-                if reaction_key not in merged_model_reactions:
+                for reaction_met in reaction.metabolites: # processing metabolic reactions that are not in objective
+                    new_met_id = __modelHandling.__create_fluxer_metabolite_id(reaction_met)
+
+                    if new_met_id is not None:
+                        if new_met_id in met_source_dict:
+                            met_source_dict[new_met_id] |= {model_index}
+                            met_model_id_dict[new_met_id] += [reaction_met.id]
+                        else:
+                            met_source_dict[new_met_id] = {model_index}
+                            met_model_id_dict[new_met_id] = [reaction_met.id]
+                        met_counted |= {new_met_id}
+                    else:
+                        if reaction_met.id in met_source_dict:
+                            met_source_dict[reaction_met.id] |= {model_index}
+                            met_counted |= {reaction_met.id}
+                        else:
+                            met_source_dict[reaction_met.id] = {model_index}
+
+                    if (new_met_id not in model.metabolites) and (new_met_id is not None):
+                        reaction_met.id = new_met_id
+
+                reaction_key, rev_reaction_key = __modelHandling.__create_reaction_key(reaction, False)
+                if (reaction_key not in merged_model_reactions) and (rev_reaction_key not in merged_model_reactions):
                     template_model.add_reactions([reaction.copy()])
                     merged_model_reactions[reaction_key] = reaction.copy()
+                    merged_model_reactions[rev_reaction_key] = reaction.copy()
 
-                    if reaction.id not in reac_source_dict:
-                        reac_source_dict[reaction.id] = {model_index}
-                    else:
-                        reac_source_dict[reaction.id] |= {model_index}
-
-                    if model_index == 0:
-                        num_ref_model_reacs += 1
+                    reac_source_dict[reaction.id] = {model_index}
 
                 else:
                     existing_reac = merged_model_reactions.get(reaction_key)
-                    reac_source_dict[existing_reac.id] |= {model_index}  # source of reactions by metabolite key
+                    if existing_reac is not None:
+                        reac_source_dict[existing_reac.id] |= {model_index}
 
-                    if model_index != 0:
-                        if 0 in reac_source_dict[existing_reac.id]:
-                            num_reac_merged += 1
-                            total_reacs_merged += 1
-
-                    existing_reac.gene_reaction_rule = __modelHandling.__update_gene_rule(existing_reac, reaction)
+                    else:
+                        rev_existing_reac = merged_model_reactions.get(rev_reaction_key)
+                        if rev_existing_reac is not None:
+                            reac_source_dict[rev_existing_reac.id] |= {model_index}
 
         if model_index == 0:
             model_jaccard_distances += [(0, 0)]
         else:
-            model_jaccard_distances += [(__modelHandling.__calculate_jaccard_distance(len(ref_model_mets), num_met_merged),
-                                        __modelHandling.__calculate_jaccard_distance(num_ref_model_reacs, num_reac_merged))]
+            for met_sources in met_source_dict.values():
+                if met_sources == {0}:
+                    ref_model_mets += 1
+                elif met_sources == {model_index}:
+                    unique_to_current_model += 1
+                elif len(met_sources) > 1:
+                    total_mets_merged += 1
+                    num_met_merged += 1
+
+            for reac_sources in reac_source_dict.values():
+                if reac_sources == {0}:
+                    num_ref_model_reacs += 1
+                elif reac_sources == {model_index}:
+                    unique_to_current_model_r += 1
+                elif len(reac_sources) > 1:
+                    total_reacs_merged += 1
+                    num_reac_merged += 1
+
+            model_jaccard_distances += [
+                (__modelHandling.__calculate_jaccard_distance(ref_model_mets, num_met_merged, unique_to_current_model),
+                 __modelHandling.__calculate_jaccard_distance(num_ref_model_reacs, num_reac_merged, unique_to_current_model_r))]
 
         list_of_objective_reactions.append(list_model_objectives)
 
@@ -160,12 +188,20 @@ def merge(list_of_inputs, set_objective='merge'):
         else:
             met_source_cleaned[metabolite_id] = source_set
 
+    if set_objective == 'merge':
+        reac_source_dict['merged_objectives'] = set(model_num for model_num in range(0, len(list_of_models)))
+
     met_and_reac_sources += (__modelHandling.__set_to_list_source_dict(met_source_cleaned),
                              __modelHandling.__set_to_list_source_dict(reac_source_dict))
     template_model = __modelHandling.__set_objective_expression(template_model, list_of_models,
                                                                 list_of_objective_reactions, set_objective)
     merged_model_id = merged_model_id[:-1]
-    merged_model = __modelHandling.__convert_template_to_merged_model(template_model, merged_model_id, met_model_id_dict)
+    merged_model = __modelHandling.__convert_template_to_merged_model(template_model, merged_model_id,
+                                                                      met_model_id_dict, met_model_id_dict)
+
+    merged_model.repair()
+
+
 
     result['merged_model'] = merged_model
     result['jacc_d'] = model_jaccard_distances
