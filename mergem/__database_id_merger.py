@@ -27,6 +27,7 @@ modelSeed_met_url = "https://raw.githubusercontent.com/ModelSEED/ModelSEEDDataba
 modelSeed_met_aliases_url = "https://raw.githubusercontent.com/ModelSEED/ModelSEEDDatabase/master/Biochemistry/Aliases/Unique_ModelSEED_Compound_Aliases.txt"
 metaNetX_compounds_url = "https://ftp.vital-it.ch/databases/metanetx/MNXref/latest/chem_prop.tsv"
 metaNetX_met_xref_url = "https://ftp.vital-it.ch/databases/metanetx/MNXref/latest/chem_xref.tsv"
+metaNetX_met_depr_url = "https://ftp.vital-it.ch/databases/metanetx/MNXref/latest/chem_depr.tsv"
 bigg_metabolites_url = "http://bigg.ucsd.edu/static/namespace/bigg_models_metabolites.txt"
 chebi_compound_structure_url = "http://ftp.ebi.ac.uk/pub/databases/chebi/Flat_file_tab_delimited/structures.csv.gz"
 chebi_compounds_url = "http://ftp.ebi.ac.uk/pub/databases/chebi/Flat_file_tab_delimited/compounds.tsv.gz"
@@ -36,6 +37,7 @@ ms_met_filename = files_dir + "modelSeed_compounds.tsv"
 ms_met_aliases_filename = files_dir + "modelseed_compound_aliases.txt"
 mx_chem_prop_filename = files_dir + "metanetx_chem_prop.tsv"
 mx_met_xref_filename = files_dir + "metanetx_chem_xref.tsv"
+mx_met_depr_filename = files_dir + "metanetx_chem_depr.tsv"
 bigg_metabolites_filename = files_dir + "bigg_models_metabolites.txt"
 kegg_metabolites_filename = files_dir
 chebi_compound_st_zipped_filename = files_dir + "chebi_structures.csv.gz"
@@ -63,6 +65,7 @@ url_dictionary = {ms_met_filename: modelSeed_met_url,
                   ms_met_aliases_filename: modelSeed_met_aliases_url,
                   mx_chem_prop_filename: metaNetX_compounds_url,
                   mx_met_xref_filename: metaNetX_met_xref_url,
+                  mx_met_depr_filename: metaNetX_met_depr_url,
                   bigg_metabolites_filename: bigg_metabolites_url,
                   chebi_compounds_zipped_filename: chebi_compounds_url,
                   chebi_compound_st_zipped_filename: chebi_compound_structure_url,
@@ -251,11 +254,15 @@ def __process_cross_ref_info(file_name, xref_line_reader):
     for source_id, xref_list in xref_dict.items():
         for other_id in xref_list:
             source_fluxer_id = dict_any_met_id_to_fluxer_id[source_id]
-            if other_id in list_primary_ids:
-                __merge_identifiers(source_id, other_id)
-            elif (other_id not in dict_any_met_id_to_fluxer_id) and (other_id.split(":", 1)[0] not in primary_dbs):
+            if other_id not in dict_any_met_id_to_fluxer_id:
                 dict_any_met_id_to_fluxer_id[other_id] = source_fluxer_id
                 dict_fluxer_id_to_met_prop[source_fluxer_id]['ids'] += [other_id]
+            else:
+                other_prop = dict_fluxer_id_to_met_prop[dict_any_met_id_to_fluxer_id[other_id]]
+                source_db = source_id.rsplit(':', 1)[0]
+                existing_db_mappings = [db_id.rsplit(':', 1)[0] for db_id in other_prop['ids']]
+                if source_db not in existing_db_mappings:
+                    __merge_identifiers(source_id, other_id)
 
     __log("Done processing file " + file_name)
     __log(f"Number of metabolite ids: {len(dict_any_met_id_to_fluxer_id)}")
@@ -413,7 +420,7 @@ def __metanetx_chem_prop_xref_reader(file_name):
     with open(file_name, "r") as db_file:
         next(db_file)  # skip header
         for line in db_file:
-            if (line[0][0] != "M") or (":" not in line[2]):
+            if (line[0][0] == '#') or (':' not in line[2]):
                 continue
             [other_db, other_db_id] = line[2].split(":", 1)
             source_id = "metanetx:" + line[0]
@@ -421,7 +428,6 @@ def __metanetx_chem_prop_xref_reader(file_name):
 
             if other_db.lower() == "mnx":
                 other_id = "metanetx:" + other_db_id
-                other_db_name = "metanetx"
 
             elif other_db.lower() in {"kegge", "envipathm", "envipath", "biggm", "seedm", "reactomem", "lipidmapsm"}:
                 continue
@@ -442,6 +448,53 @@ def __metanetx_chem_prop_xref_reader(file_name):
     return xref_dict
 
 
+def __metanetx_chem_depr_reader(file_name):
+    """
+    Reader function for deprecated metabolite IDs in MetaNetX. \n
+    :param file_name: name of deprecated IDs file
+    :return: dictionary with latest MetaNetX IDs mapped to deprecated IDs
+    """
+    xref_dict = {}
+    version = ''
+    with open(file_name, "r") as db_file:
+        next(db_file)  # skip header
+        for line in db_file:
+            if ('#VERSION' in line) and (version == ''):
+                version = line.split('\n')[0][-3:]
+
+            if line[0][0] == '#':
+                continue
+
+            line = line.strip().split('\t')
+            if line[2] == version:
+                mnx_id = 'metanetx:' + line[1]
+                mnx_old = 'metanetx:' + line[0]
+
+                if mnx_id in xref_dict:
+                    xref_dict[mnx_id] += [mnx_old]
+                else:
+                    xref_dict[mnx_id] = [mnx_old]
+
+    return xref_dict
+
+
+def __metanetx_chem_xref_line_reader(line):
+    """
+        Reader function for metanetx compounds. \n
+        :param line: line from file
+        :return: dictionary with properties from line
+    """
+    if line[0][0] == '#':
+        return None
+
+    ids = ["metanetx:" + line[1]]
+    name = [line[2]]
+
+    if 'obsolete' not in name[0]:
+        return {'ids': ids
+                }
+
+
 def __metanetx_chem_xref_reader(file_name):
     """
         Reader function for metanetx cross reference file. \n
@@ -455,10 +508,8 @@ def __metanetx_chem_xref_reader(file_name):
             line = line.strip().split('\t')
 
             if (line[0][0] == "#") or (line[0][0:3] == "MNX") or (line[0][0:3] == "mnx") or (line[1] == "MNXM0") or \
-                    (line[1] == "BIOMASS") or (line[1] == "WATER") or (":" not in line[0]):
-                continue
-
-            if ("unknown" in line[2].lower()) or ("no description" in line[2].lower()) or ("obsolete" in line[2].lower()) \
+                    (":" not in line[0]) or ("unknown" in line[2].lower()) or ("no description" in line[2].lower()) or \
+                    ("obsolete" in line[2].lower()) \
                     or ("molecular entity" in line[2].lower()):
                 continue
 
@@ -491,7 +542,8 @@ def __modelseed_metabolites_line_reader(line):
     """
     ids = ["seed:" + line[0]]
 
-    if (len(line[4]) > 0) and (line[4].lower() != 'none') and (line[4].lower() != 'null'):
+    if (len(line[4]) > 0) and (line[4].lower() != 'none') and (line[4].lower() != 'null')\
+            and (float(line[4]) != 10000000):
         mass = [line[4]]
     else:
         mass = []
@@ -575,7 +627,6 @@ def __bigg_metabolites_line_reader(line):
     inchikeys = []
     xref_links = []
     names = []
-
     ids += ['bigg:' + line[1]]
 
     if len(line) > 2:
@@ -641,8 +692,7 @@ def __bigg_models_xref_reader(file_name):
                         ids += [other_db_id.lower()]
                     else:
                         other_db_name = other_db.split('.')[0].lower()
-                        if other_db_name in primary_dbs:  # get only primary identifiers from bigg - incorrect chebi
-                            ids += [other_db_name + ':' + other_db_id]
+                        ids += [other_db_name + ':' + other_db_id]
 
             if source_id in xref_dict:
                 xref_dict[source_id] += [db_id for db_id in ids]
@@ -800,11 +850,16 @@ def __bigg_reactions_line_reader(line):
         return None
 
 
-def __add_values_to_property_list(property_list, prop_value):
+def __add_values_to_property_list(property_list, prop_value, for_name=False):
     invalid_values_list = ['\'\'', '\"\"', 'null', '-', '']
     for value in prop_value:
-        if (value not in invalid_values_list) and (value not in property_list):
-            property_list.append(value)
+        if not for_name:
+            if (value not in invalid_values_list) and (value not in property_list):
+                property_list.append(value)
+        else:
+            property_list_lower = [prop.lower() for prop in property_list]
+            if (value not in invalid_values_list) and (value.lower() not in property_list_lower):
+                property_list.append(value)
 
 
 def __merge_identifiers(source_id, other_id, for_reac=False):
@@ -832,65 +887,27 @@ def __merge_identifiers(source_id, other_id, for_reac=False):
     other_properties = prop_mapper[other_fluxer_id]
 
     if other_fluxer_id != source_fluxer_id:
-        matched_properties = __check_properties(source_id_properties, other_properties, for_reac)
-
-        if len(matched_properties) > 1:
-            if source_fluxer_id < other_fluxer_id:
-                for xref_id in other_properties['ids']:
-                    id_mapper[xref_id] = source_fluxer_id
-                for key, value in other_properties.items():
+        if source_fluxer_id < other_fluxer_id:
+            for xref_id in other_properties['ids']:
+                id_mapper[xref_id] = source_fluxer_id
+            for key, value in other_properties.items():
+                if key == 'Name':
+                    __add_values_to_property_list(source_id_properties[key], value, True)
+                else:
                     __add_values_to_property_list(source_id_properties[key], value)
 
-                del prop_mapper[other_fluxer_id]
+            del prop_mapper[other_fluxer_id]
 
-            else:
-                for xref_id in source_id_properties['ids']:
-                    id_mapper[xref_id] = other_fluxer_id
-                for key, value in source_id_properties.items():
+        else:
+            for xref_id in source_id_properties['ids']:
+                id_mapper[xref_id] = other_fluxer_id
+            for key, value in source_id_properties.items():
+                if key == 'Name':
+                    __add_values_to_property_list(other_properties[key], value, True)
+                else:
                     __add_values_to_property_list(other_properties[key], value)
 
-                del prop_mapper[source_fluxer_id]
-
-
-def __check_properties(source_prop, other_prop, for_reac=False):
-    matched_properties = []
-    check_prop = []
-    if not for_reac:
-        check_prop += [prop for prop in ['mass', 'inchikey', 'Name', 'formula']
-                       if len(other_prop[prop]) > 0 if len(source_prop[prop]) > 0]
-    else:
-        check_prop += [prop for prop in ['Name', 'EC_num', 'ids']
-                       if len(other_prop[prop]) > 0 if len(source_prop[prop]) > 0]
-
-    property_mismatch = False
-
-    for prop in check_prop:
-        if prop == 'mass':
-            if abs(float(other_prop[prop][0]) - float(source_prop[prop][0])) < 1:
-                matched_properties.append(prop)
-            else:
-                property_mismatch = True
-        else:
-            if prop == 'inchikey':
-                if other_prop[prop][0].lower() == source_prop[prop][0].lower():
-                    matched_properties.append(prop)
-                else:
-                    property_mismatch = True
-            elif prop in {'Name', 'formula'}:
-                for string_prop in other_prop[prop]:
-                    if string_prop.lower() in \
-                            (source_string_prop.lower() for source_string_prop in source_prop[prop]):
-                        matched_properties.append(prop)
-                        break
-
-            elif prop in {'EC_num', 'ids'}:
-                if len(set(source_prop[prop]).intersection(set(other_prop[prop]))) > 0:
-                    matched_properties.append(prop)
-
-        if (len(matched_properties) > 1) or property_mismatch:
-            break
-
-    return matched_properties
+            del prop_mapper[source_fluxer_id]
 
 
 def __clean_id_mapping_dictionary(id_dictionary, info_dictionary, for_reac=False):
@@ -917,7 +934,9 @@ def __clean_id_mapping_dictionary(id_dictionary, info_dictionary, for_reac=False
             db_name_dict[new_key] = db_name
 
     for fluxer_id in dict_copy_id_converter.values():
-        dict_copy_info[fluxer_id] = info_dictionary[fluxer_id].copy()
+        copied_info = info_dictionary[fluxer_id].copy()
+        copied_info['ids'] = list(set(copied_info['ids']))
+        dict_copy_info[fluxer_id] = copied_info
 
     __log(f"Number of database ids: {len(dict_copy_id_converter)}")
     __log(f"Number of fluxer ids: {len(dict_copy_info)}")
@@ -963,19 +982,29 @@ def __create_id_mapping_pickle():
     __log("Processing metabolites")
     tic = perf_counter()
 
+    # Process KeGG database metabolites
     __process_kegg_compounds(kegg_metabolites_filename)
+
+    # Process ChEBI database metabolite IDs
     __process_met_file(chebi_compound_structure_filename, __chebi_compounds_inchi_reader)
     __process_met_file(chebi_compounds_filename, __chebi_compounds_names)
-    __process_met_file(mx_chem_prop_filename, __metanetx_chem_prop_line_reader)
-    __process_met_file(ms_met_filename, __modelseed_metabolites_line_reader)
-    __process_met_file(bigg_metabolites_filename, __bigg_metabolites_line_reader)
 
+    # Process MetaNetX database metabolite IDs
+    __process_met_file(mx_chem_prop_filename, __metanetx_chem_prop_line_reader)
+    __process_cross_ref_info(mx_met_depr_filename, __metanetx_chem_depr_reader)
+    __process_met_file(mx_met_xref_filename, __metanetx_chem_xref_line_reader)
     __process_cross_ref_info(mx_met_xref_filename, __metanetx_chem_xref_reader)
-    __process_cross_ref_info(ms_met_filename, __modelseed_metabolites_xref_reader)
-    __process_cross_ref_info(ms_met_aliases_filename, __modelseed_met_aliases_reader)
-    __process_cross_ref_info(mx_chem_prop_filename, __metanetx_chem_prop_xref_reader)
+
+    # Process BiGG database metabolite IDs
+    __process_met_file(bigg_metabolites_filename, __bigg_metabolites_line_reader)
     __process_cross_ref_info(bigg_metabolites_filename, __bigg_models_xref_reader)
 
+    # Process ModelSEED database metabolite IDs
+    __process_met_file(ms_met_filename, __modelseed_metabolites_line_reader)
+    __process_cross_ref_info(ms_met_filename, __modelseed_metabolites_xref_reader)
+    __process_cross_ref_info(ms_met_aliases_filename, __modelseed_met_aliases_reader)
+
+    # Process reaction IDs from modelSEED, MetaNetX, and BiGG
     __process_reac_file(ms_reac_filename, __modelSeed_reactions_line_reader)
     __process_reac_file(ms_reac_pathways_filename, __modelSeed_reaction_pathways_line_reader)
     __process_reac_file(mx_reac_prop_filename, __metanetx_reaction_prop_line_reader)

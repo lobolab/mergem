@@ -201,8 +201,6 @@ def merge(list_of_inputs, set_objective='merge'):
 
     merged_model.repair()
 
-
-
     result['merged_model'] = merged_model
     result['jacc_d'] = model_jaccard_distances
     result['Met_merged'] = total_mets_merged
