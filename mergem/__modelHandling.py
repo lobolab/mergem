@@ -12,7 +12,7 @@ from pickle import load
 import os
 from . import __database_id_merger
 
-curr_dir = os.path.relpath(__file__)
+curr_dir = os.path.dirname(os.path.relpath(__file__))
 __fluxer_met_id_dict, __fluxer_met_info_dict = {}, {}
 
 
