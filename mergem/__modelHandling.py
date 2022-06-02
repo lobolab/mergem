@@ -12,7 +12,7 @@ from pickle import load
 import os
 from . import __database_id_merger
 
-curr_dir = os.path.dirname(os.path.abspath(__file__))
+curr_dir = os.path.relpath(__file__)
 __fluxer_met_id_dict, __fluxer_met_info_dict = {}, {}
 
 
@@ -324,6 +324,59 @@ def __export_merged_model(cobra_model, file_name):
         cobra.io.save_yaml_model(cobra_model, file_name)
     else:
         raise IOError('Unable to save merged model. Check file format {}'.format(file_name))
+
+
+def __create_jaccard_matrix(num_models, met_source_dict, reac_source_dict):
+    """
+    Creates Jaccard distances matrix using dictionaries with source of each metabolite
+    and reaction in merged model.
+    :param num_models: number of input models
+    :param met_source_dict: dictionary with source of each metabolite
+    :param reac_source_dict: dictionary with source of each reaction
+    :return: Jaccard distance matrices for metabolites and reactions
+    """
+    met_uniq_num = [0] * num_models
+    reac_uniq_num = [0] * num_models
+    jacc_matrix_met, jacc_matrix_reac = [], []
+    total_mets_merged, total_reacs_merged = 0, 0
+
+    for met_sources in met_source_dict.values():
+        if len(met_sources) > 1:
+            total_mets_merged += 1
+        else:
+            met_uniq_num[list(met_sources)[0]] += 1
+
+    for reac_sources in reac_source_dict.values():
+        if len(reac_sources) > 1:
+            total_reacs_merged += 1
+        else:
+            reac_uniq_num[list(reac_sources)[0]] += 1
+
+    for i in range(0, num_models):
+        jd_row_met, jd_row_reac = [], []
+        for j in range(0, num_models):
+            num_met_merged = 0
+            num_reac_merged = 0
+
+            if i != j:
+                for met_source in met_source_dict.values():
+                    if (i in met_source) and (j in met_source):
+                        num_met_merged += 1
+                for reac_source in reac_source_dict.values():
+                    if (i in reac_source) and (j in reac_source):
+                        num_reac_merged += 1
+
+                jd_row_met += [__calculate_jaccard_distance(met_uniq_num[i], num_met_merged, met_uniq_num[j])]
+                jd_row_reac += [__calculate_jaccard_distance(reac_uniq_num[i], num_met_merged, reac_uniq_num[j])]
+
+            else:
+                jd_row_met += [0]
+                jd_row_reac += [0]
+
+        jacc_matrix_met += [jd_row_met]
+        jacc_matrix_reac += [jd_row_reac]
+
+    return jacc_matrix_met, jacc_matrix_reac
 
 
 def __calculate_jaccard_distance(num_reference, num_merged, num_unique):

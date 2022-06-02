@@ -59,13 +59,10 @@ def merge(list_of_inputs, set_objective='merge'):
     met_source_dict, reac_source_dict, met_model_id_dict = {}, {}, {}
     merged_model_reactions = {}
     total_mets_merged, total_reacs_merged = 0, 0
-    model_jaccard_distances = []
-    ref_model_mets = 0
     met_and_reac_sources = []
 
     merged_model_id = 'merged_'
     template_model = cobra.Model(merged_model_id)
-    num_ref_model_reacs = len(list_of_models[0].reactions)
     __modelHandling.__load_or_create_id_mapper()
     cleaned_models = []
 
@@ -100,9 +97,6 @@ def merge(list_of_inputs, set_objective='merge'):
         model = list_of_models[model_index]
         merged_model_id += model.id + "_"
         list_model_objectives = []
-        num_met_merged = 0
-        num_reac_merged = 0
-        unique_to_current_model, unique_to_current_model_r = 0, 0
         met_counted = set()
 
         for reaction in model.reactions:
@@ -153,32 +147,10 @@ def merge(list_of_inputs, set_objective='merge'):
                         if rev_existing_reac is not None:
                             reac_source_dict[rev_existing_reac.id] |= {model_index}
 
-        if model_index == 0:
-            model_jaccard_distances += [(0, 0)]
-        else:
-            for met_sources in met_source_dict.values():
-                if met_sources == {0}:
-                    ref_model_mets += 1
-                elif met_sources == {model_index}:
-                    unique_to_current_model += 1
-                elif len(met_sources) > 1:
-                    total_mets_merged += 1
-                    num_met_merged += 1
-
-            for reac_sources in reac_source_dict.values():
-                if reac_sources == {0}:
-                    num_ref_model_reacs += 1
-                elif reac_sources == {model_index}:
-                    unique_to_current_model_r += 1
-                elif len(reac_sources) > 1:
-                    total_reacs_merged += 1
-                    num_reac_merged += 1
-
-            model_jaccard_distances += [
-                (__modelHandling.__calculate_jaccard_distance(ref_model_mets, num_met_merged, unique_to_current_model),
-                 __modelHandling.__calculate_jaccard_distance(num_ref_model_reacs, num_reac_merged, unique_to_current_model_r))]
-
         list_of_objective_reactions.append(list_model_objectives)
+
+    jacc_matrix_met, jacc_matrix_reac = __modelHandling.__create_jaccard_matrix(len(cleaned_models), met_source_dict,
+                                                                                reac_source_dict)
 
     met_source_cleaned = {}
     for metabolite_id in met_source_dict.keys():
@@ -202,7 +174,7 @@ def merge(list_of_inputs, set_objective='merge'):
     merged_model.repair()
 
     result['merged_model'] = merged_model
-    result['jacc_d'] = model_jaccard_distances
+    result['jacc_d'] = [jacc_matrix_met, jacc_matrix_reac]
     result['Met_merged'] = total_mets_merged
     result['Reac_merged'] = total_reacs_merged
     result['Met_sources'] = met_and_reac_sources[0]
