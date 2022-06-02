@@ -72,7 +72,7 @@ def __get_fluxer_id(db_id):
 
 
 # convert cellular localization to single namespace
-def __get_localization(id_or_model_localization):
+def get_localization(id_or_model_localization):
     """
     Converts localization suffixes into common notation.
     :param id_or_model_localization: cellular localization of entity in model
@@ -126,21 +126,21 @@ def __create_reaction_key(reaction, reverse=False):
     return reac_metabolite_set, reac_rev_met_set
 
 # returns a metabolite id in fluxer namespace with cellular localization
-def __create_fluxer_metabolite_id(metabolite):
+def create_fluxer_metabolite_id(metabolite):
     """
     Takes a metabolite object as input and returns fluxer_id notation for metabolite
     :param metabolite: Cobra metabolite object
     :return: Fluxer_id notation for the metabolite
     """
     met_fluxer_id = __get_fluxer_id(metabolite.id)
-    met_compartment = __get_localization(metabolite.compartment)
+    met_compartment = get_localization(metabolite.compartment)
 
     if met_fluxer_id is not None:
         if (met_compartment == '') & ('_' in metabolite.id):
             if '@' in metabolite.id:
-                met_compartment = __get_localization(metabolite.id.rsplit('@', 1)[1])
+                met_compartment = get_localization(metabolite.id.rsplit('@', 1)[1])
             else:
-                met_compartment = __get_localization(metabolite.id.rsplit("_", 1)[1])
+                met_compartment = get_localization(metabolite.id.rsplit("_", 1)[1])
 
             if met_compartment != '':
                 met_id = "fluxer_" + str(met_fluxer_id) + "_" + met_compartment

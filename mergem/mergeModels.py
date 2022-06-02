@@ -71,7 +71,7 @@ def merge(list_of_inputs, set_objective='merge'):
         model_mets = {}
         update_reactions = []
         for met in model.metabolites:
-            met_fluxer_id = __modelHandling.__create_fluxer_metabolite_id(met)
+            met_fluxer_id = __modelHandling.create_fluxer_metabolite_id(met)
             if met_fluxer_id not in model_mets:
                 model_mets[met_fluxer_id] = met.copy()
             else:
@@ -109,7 +109,7 @@ def merge(list_of_inputs, set_objective='merge'):
 
             else:
                 for reaction_met in reaction.metabolites: # processing metabolic reactions that are not in objective
-                    new_met_id = __modelHandling.__create_fluxer_metabolite_id(reaction_met)
+                    new_met_id = __modelHandling.create_fluxer_metabolite_id(reaction_met)
 
                     if new_met_id is not None:
                         if new_met_id in met_source_dict:
