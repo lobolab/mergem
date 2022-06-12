@@ -17,7 +17,7 @@ import os
 import requests
 import ssl
 
-curr_dir = os.path.dirname(os.path.relpath(__file__))
+curr_dir = os.path.dirname(__file__)
 files_dir = os.path.join(curr_dir, "downloads/")
 pickle_dir = os.path.join(curr_dir, "data/")
 log_dir = os.path.join(curr_dir, "logs/")
