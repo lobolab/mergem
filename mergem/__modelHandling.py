@@ -162,55 +162,27 @@ def __create_merged_objective(input_merged_model, list_of_obj_reac_lists):
     :return: Merged model with its objective set to the merged objective reactions
     """
     merged_reaction = Reaction('merged_objectives')
+    st_dict = {}
 
     for reaction_list in list_of_obj_reac_lists:
         for reaction in reaction_list:
-            merged_reaction = __merge_obj_reactions(merged_reaction, reaction)
+            for metabolite in reaction.metabolites:
+                if metabolite.id not in st_dict:
+                    st_dict[metabolite.id] = set()
+                st_dict[metabolite.id] |= {reaction.metabolites[metabolite]}
+
             merged_reaction.name += reaction.id + "; "
+
+    for metabolite_id, met_stoichiometries in st_dict.items():
+        copy_met = input_merged_model.metabolites.get_by_id(metabolite_id).copy()
+        avg_stoichiometry = sum(met_stoichiometries)/len(met_stoichiometries)
+        merged_reaction.add_metabolites({copy_met: avg_stoichiometry})
 
     if len(merged_reaction.metabolites) > 1:
         input_merged_model.add_reactions({merged_reaction})
         input_merged_model.objective = merged_reaction.id
 
     return input_merged_model
-
-
-# merges the right reaction into merged reaction
-def __merge_obj_reactions(merged_r, right_r, operation='avg'):
-    """
-    Merge right reaction into the first reaction.
-    :param merged_r: Reaction to which other reaction is merged
-    :param right_r: The reaction to be merged
-    :param operation: 'Avg' the stoichiometries of common metabolites
-    :return: merged reaction
-    """
-    merged_metabolites = {}
-
-    for met in merged_r.metabolites:
-        merged_metabolites[met.id] = merged_r.metabolites[met]  # store st coefficients
-
-    for met in right_r.metabolites:
-        right_met_stoichiometry = right_r.metabolites[met]
-        merged_met_stoichiometry = merged_metabolites.get(met.id, 0)
-        copy_met = met.copy()
-
-        if (merged_met_stoichiometry != 0) & (merged_met_stoichiometry != right_met_stoichiometry):
-            if operation == 'avg':
-                met_stoichiometry = ((merged_met_stoichiometry + right_met_stoichiometry) / 2.0)
-            elif operation == 'max':
-                met_stoichiometry = max(merged_met_stoichiometry, right_met_stoichiometry)
-            else:
-                met_stoichiometry = min(merged_met_stoichiometry, right_met_stoichiometry)
-
-        elif (merged_met_stoichiometry != 0) & (merged_met_stoichiometry == right_met_stoichiometry):
-            continue
-
-        elif merged_met_stoichiometry == 0:
-            met_stoichiometry = right_met_stoichiometry
-
-        merged_r.add_metabolites({copy_met: met_stoichiometry})
-
-    return merged_r
 
 
 # Creates a model containing the merged reactions and metabolites in original namespaces
