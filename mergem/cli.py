@@ -1,6 +1,6 @@
 #!/usr/bin/python
 """
-    Uses Fluxer dictionaries to translate models to common namespace
+    Uses mergem dictionaries to translate models to common namespace
     and then merges the models to remove metabolite and reaction
     duplicates.
     Resulting model can be FBA simulated.

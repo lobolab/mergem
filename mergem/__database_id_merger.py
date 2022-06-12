@@ -1,7 +1,7 @@
 """
     Downloads metabolite information files from Kegg, Chebi, ModelSeed, MetaNetX and Bigg
     databases. Creates a dictionary mapping external database metabolite IDs
-    to a Fluxer ID and another dictionary mapping Fluxer ID to metabolite properties.
+    to a mergem ID and another dictionary mapping mergem ID to metabolite properties.
     Copyright (c) Lobo Lab (https://lobolab.umbc.edu)
 """
 
@@ -84,15 +84,15 @@ url_dictionary_chebi = {chebi_compounds_filename: chebi_compounds_zipped_filenam
                         }
 
 # Dictionaries
-dict_any_met_id_to_fluxer_id = {}
-dict_fluxer_id_to_met_prop = {}
+dict_any_met_id_to_mergem_id = {}
+dict_mergem_id_to_met_prop = {}
 list_primary_ids = set()
-met_last_fluxer_id, reac_last_fluxer_id = 0, 0
+met_last_mergem_id, reac_last_mergem_id = 0, 0
 start_time = datetime.now().strftime("%Y%m%d_%HH%MM")
 primary_dbs = ['seed', 'metanetx', 'bigg', 'kegg', 'chebi']
 
-dict_any_reac_id_to_fluxer_id = {}
-dict_fluxer_id_to_reac_prop = {}
+dict_any_reac_id_to_mergem_id = {}
+dict_mergem_id_to_reac_prop = {}
 
 
 def __log(message):
@@ -206,8 +206,8 @@ def __process_reac_file(file_name, file_line_reader):
                 __append_reac_properties(reac_properties)
 
     __log("Done processing file " + file_name)
-    __log(f"Number of reaction ids: {len(dict_any_reac_id_to_fluxer_id)}")
-    __log(f"Number of fluxer ids: {len(dict_fluxer_id_to_reac_prop)}")
+    __log(f"Number of reaction ids: {len(dict_any_reac_id_to_mergem_id)}")
+    __log(f"Number of mergem ids: {len(dict_mergem_id_to_reac_prop)}")
     __log("")
 
 
@@ -234,8 +234,8 @@ def __process_met_file(file_name, file_line_reader):
                     __append_met_properties(met_properties)
 
     __log("Done processing file " + file_name)
-    __log(f"Number of metabolite ids: {len(dict_any_met_id_to_fluxer_id)}")
-    __log(f"Number of fluxer ids: {len(dict_fluxer_id_to_met_prop)}")
+    __log(f"Number of metabolite ids: {len(dict_any_met_id_to_mergem_id)}")
+    __log(f"Number of mergem ids: {len(dict_mergem_id_to_met_prop)}")
     __log(f"List of primary ids: {len(list_primary_ids)}")
     __log("")
 
@@ -248,82 +248,82 @@ def __process_cross_ref_info(file_name, xref_line_reader):
     """
     __log("Processing file " + file_name)
 
-    global dict_any_met_id_to_fluxer_id, dict_fluxer_id_to_met_prop
+    global dict_any_met_id_to_mergem_id, dict_mergem_id_to_met_prop
     xref_dict = xref_line_reader(file_name)
 
     for source_id, xref_list in xref_dict.items():
         for other_id in xref_list:
-            source_fluxer_id = dict_any_met_id_to_fluxer_id[source_id]
-            if other_id not in dict_any_met_id_to_fluxer_id:
-                dict_any_met_id_to_fluxer_id[other_id] = source_fluxer_id
-                dict_fluxer_id_to_met_prop[source_fluxer_id]['ids'] += [other_id]
+            source_mergem_id = dict_any_met_id_to_mergem_id[source_id]
+            if other_id not in dict_any_met_id_to_mergem_id:
+                dict_any_met_id_to_mergem_id[other_id] = source_mergem_id
+                dict_mergem_id_to_met_prop[source_mergem_id]['ids'] += [other_id]
             else:
-                other_prop = dict_fluxer_id_to_met_prop[dict_any_met_id_to_fluxer_id[other_id]]
+                other_prop = dict_mergem_id_to_met_prop[dict_any_met_id_to_mergem_id[other_id]]
                 source_db = source_id.rsplit(':', 1)[0]
                 existing_db_mappings = [db_id.rsplit(':', 1)[0] for db_id in other_prop['ids']]
                 if source_db not in existing_db_mappings:
                     __merge_identifiers(source_id, other_id)
 
     __log("Done processing file " + file_name)
-    __log(f"Number of metabolite ids: {len(dict_any_met_id_to_fluxer_id)}")
-    __log(f"Number of fluxer ids: {len(dict_fluxer_id_to_met_prop)}")
+    __log(f"Number of metabolite ids: {len(dict_any_met_id_to_mergem_id)}")
+    __log(f"Number of mergem ids: {len(dict_mergem_id_to_met_prop)}")
     __log("")
 
 
 def __append_met_properties(met_properties):
-    global list_primary_ids, dict_any_met_id_to_fluxer_id, dict_fluxer_id_to_met_prop
-    fluxer_id = dict_any_met_id_to_fluxer_id.get(met_properties['ids'][0], maxsize)
+    global list_primary_ids, dict_any_met_id_to_mergem_id, dict_mergem_id_to_met_prop
+    mergem_id = dict_any_met_id_to_mergem_id.get(met_properties['ids'][0], maxsize)
 
-    if fluxer_id == maxsize:
-        global met_last_fluxer_id
-        met_last_fluxer_id = met_last_fluxer_id + 1
-        fluxer_id = met_last_fluxer_id
+    if mergem_id == maxsize:
+        global met_last_mergem_id
+        met_last_mergem_id = met_last_mergem_id + 1
+        mergem_id = met_last_mergem_id
 
-        dict_fluxer_id_to_met_prop[fluxer_id] = {'Name': [], 'ids': [], 'formula': [],
+        dict_mergem_id_to_met_prop[mergem_id] = {'Name': [], 'ids': [], 'formula': [],
                                                  'mass': [], 'inchikey': [], 'xref_links': []}
 
-    dict_any_met_id_to_fluxer_id[met_properties['ids'][0]] = fluxer_id
-    fluxer_met_properties = dict_fluxer_id_to_met_prop[fluxer_id]
+    dict_any_met_id_to_mergem_id[met_properties['ids'][0]] = mergem_id
+    mergem_met_properties = dict_mergem_id_to_met_prop[mergem_id]
     list_primary_ids |= {db_id for db_id in met_properties['ids']}
-    fluxer_met_properties['ids'] += [met_properties['ids'][0]]
+    mergem_met_properties['ids'] += [met_properties['ids'][0]]
 
     for key, value in met_properties.items():
         if (key == 'ids') and (len(value) > 1):
             for met_id in value:
-                if met_id not in dict_any_met_id_to_fluxer_id:
-                    dict_any_met_id_to_fluxer_id[met_id] = fluxer_id
-                    fluxer_met_properties[key] += [met_id]
+                if met_id not in dict_any_met_id_to_mergem_id:
+                    dict_any_met_id_to_mergem_id[met_id] = mergem_id
+                    mergem_met_properties[key] += [met_id]
         else:
-            __add_values_to_property_list(fluxer_met_properties[key], value)
+            __add_values_to_property_list(mergem_met_properties[key], value)
 
 
 def __append_reac_properties(reac_properties):
-    global dict_any_reac_id_to_fluxer_id, dict_fluxer_id_to_reac_prop
-    fluxer_id = min(fl_id for fl_id in (dict_any_reac_id_to_fluxer_id.get(reac_id, maxsize)
+    global dict_any_reac_id_to_mergem_id, dict_mergem_id_to_reac_prop
+    mergem_id = min(fl_id for fl_id in (dict_any_reac_id_to_mergem_id.get(reac_id, maxsize)
                                         for reac_id in reac_properties['ids']))
 
-    if fluxer_id == maxsize:
-        global reac_last_fluxer_id
-        reac_last_fluxer_id = reac_last_fluxer_id + 1
-        fluxer_id = reac_last_fluxer_id
-        dict_fluxer_id_to_reac_prop[fluxer_id] = {'ids': [], 'Name': [],
+    if mergem_id == maxsize:
+        global reac_last_mergem_id
+        reac_last_mergem_id = reac_last_mergem_id + 1
+        mergem_id = reac_last_mergem_id
+        dict_mergem_id_to_reac_prop[mergem_id] = {'ids': [], 'Name': [],
                                                   'EC_num': [], 'Pathways': [], 'xref_links': []}
     unadded_db_ids = []
     for key, value in reac_properties.items():
         if key == 'ids':
             for other_id in value:
-                other_fluxer_id = dict_any_reac_id_to_fluxer_id.get(other_id)
-                if other_fluxer_id is None:
-                    dict_any_reac_id_to_fluxer_id[other_id] = fluxer_id
-                    dict_fluxer_id_to_reac_prop[fluxer_id]['ids'] += [other_id]
+                other_mergem_id = dict_any_reac_id_to_mergem_id.get(other_id)
+                if other_mergem_id is None:
+                    dict_any_reac_id_to_mergem_id[other_id] = mergem_id
+                    dict_mergem_id_to_reac_prop[mergem_id]['ids'] += [other_id]
                 else:
                     unadded_db_ids.append(other_id)
         else:
-            __add_values_to_property_list(dict_fluxer_id_to_reac_prop[fluxer_id][key], value)
+            __add_values_to_property_list(dict_mergem_id_to_reac_prop[mergem_id][key], value)
 
     for db_id in unadded_db_ids:
-        other_fluxer_id = dict_any_reac_id_to_fluxer_id.get(db_id)
-        __merge_identifiers(fluxer_id, other_fluxer_id, True)
+        other_mergem_id = dict_any_reac_id_to_mergem_id.get(db_id)
+        __merge_identifiers(mergem_id, other_mergem_id, True)
 
 
 def __process_kegg_compounds(filename):
@@ -346,8 +346,8 @@ def __process_kegg_compounds(filename):
         __append_met_properties(property_dict)
 
     __log(f"Done processing file {filename}")
-    __log(f"Number of metabolite ids: {len(dict_any_met_id_to_fluxer_id)}")
-    __log(f"Number of fluxer ids: {len(dict_fluxer_id_to_met_prop)}")
+    __log(f"Number of metabolite ids: {len(dict_any_met_id_to_mergem_id)}")
+    __log(f"Number of mergem ids: {len(dict_mergem_id_to_met_prop)}")
     __log("")
 
 
@@ -864,50 +864,50 @@ def __add_values_to_property_list(property_list, prop_value, for_name=False):
 
 def __merge_identifiers(source_id, other_id, for_reac=False):
     """
-    Merges the two met IDs into lowest fluxer ID only if at least two properties match.
+    Merges the two met IDs into lowest mergem ID only if at least two properties match.
     :param source_id: primary metabolite ID from database being processed
     :param other_id: cross referenced metabolite ID to be mapped to primary met ID
     """
-    global dict_fluxer_id_to_met_prop, dict_any_met_id_to_fluxer_id, \
-        dict_fluxer_id_to_reac_prop, dict_any_reac_id_to_fluxer_id
+    global dict_mergem_id_to_met_prop, dict_any_met_id_to_mergem_id, \
+        dict_mergem_id_to_reac_prop, dict_any_reac_id_to_mergem_id
 
     if for_reac:
-        source_fluxer_id = source_id
-        other_fluxer_id = other_id
-        id_mapper = dict_any_reac_id_to_fluxer_id
-        prop_mapper = dict_fluxer_id_to_reac_prop
+        source_mergem_id = source_id
+        other_mergem_id = other_id
+        id_mapper = dict_any_reac_id_to_mergem_id
+        prop_mapper = dict_mergem_id_to_reac_prop
 
     else:
-        source_fluxer_id = dict_any_met_id_to_fluxer_id.get(source_id)
-        other_fluxer_id = dict_any_met_id_to_fluxer_id.get(other_id)
-        id_mapper = dict_any_met_id_to_fluxer_id
-        prop_mapper = dict_fluxer_id_to_met_prop
+        source_mergem_id = dict_any_met_id_to_mergem_id.get(source_id)
+        other_mergem_id = dict_any_met_id_to_mergem_id.get(other_id)
+        id_mapper = dict_any_met_id_to_mergem_id
+        prop_mapper = dict_mergem_id_to_met_prop
 
-    source_id_properties = prop_mapper[source_fluxer_id]
-    other_properties = prop_mapper[other_fluxer_id]
+    source_id_properties = prop_mapper[source_mergem_id]
+    other_properties = prop_mapper[other_mergem_id]
 
-    if other_fluxer_id != source_fluxer_id:
-        if source_fluxer_id < other_fluxer_id:
+    if other_mergem_id != source_mergem_id:
+        if source_mergem_id < other_mergem_id:
             for xref_id in other_properties['ids']:
-                id_mapper[xref_id] = source_fluxer_id
+                id_mapper[xref_id] = source_mergem_id
             for key, value in other_properties.items():
                 if key == 'Name':
                     __add_values_to_property_list(source_id_properties[key], value, True)
                 else:
                     __add_values_to_property_list(source_id_properties[key], value)
 
-            del prop_mapper[other_fluxer_id]
+            del prop_mapper[other_mergem_id]
 
         else:
             for xref_id in source_id_properties['ids']:
-                id_mapper[xref_id] = other_fluxer_id
+                id_mapper[xref_id] = other_mergem_id
             for key, value in source_id_properties.items():
                 if key == 'Name':
                     __add_values_to_property_list(other_properties[key], value, True)
                 else:
                     __add_values_to_property_list(other_properties[key], value)
 
-            del prop_mapper[source_fluxer_id]
+            del prop_mapper[source_mergem_id]
 
 
 def __clean_id_mapping_dictionary(id_dictionary, info_dictionary, for_reac=False):
@@ -933,13 +933,13 @@ def __clean_id_mapping_dictionary(id_dictionary, info_dictionary, for_reac=False
         if new_key not in db_name_dict:
             db_name_dict[new_key] = db_name
 
-    for fluxer_id in dict_copy_id_converter.values():
-        copied_info = info_dictionary[fluxer_id].copy()
+    for mergem_id in dict_copy_id_converter.values():
+        copied_info = info_dictionary[mergem_id].copy()
         copied_info['ids'] = list(set(copied_info['ids']))
-        dict_copy_info[fluxer_id] = copied_info
+        dict_copy_info[mergem_id] = copied_info
 
     __log(f"Number of database ids: {len(dict_copy_id_converter)}")
-    __log(f"Number of fluxer ids: {len(dict_copy_info)}")
+    __log(f"Number of mergem ids: {len(dict_copy_info)}")
     __log("")
 
     return dict_copy_id_converter, dict_copy_info
@@ -964,8 +964,8 @@ def __create_id_mapping_pickle():
     Main function that downloads database files and processes them to merge identifiers into a mapping dictionary.
     Mapping dictionary is serialized and saved.
     """
-    global dict_any_met_id_to_fluxer_id, dict_fluxer_id_to_met_prop, \
-        dict_any_reac_id_to_fluxer_id, dict_fluxer_id_to_reac_prop
+    global dict_any_met_id_to_mergem_id, dict_mergem_id_to_met_prop, \
+        dict_any_reac_id_to_mergem_id, dict_mergem_id_to_reac_prop
 
     print("Creating directories")
     __create_directories()
@@ -1012,29 +1012,29 @@ def __create_id_mapping_pickle():
     __process_reac_file(bigg_reactions_filename, __bigg_reactions_line_reader)
 
     __log("Cleaning reaction id mapping dictionary")
-    dict_any_reac_id_to_fluxer_id, dict_fluxer_id_to_reac_prop = __clean_id_mapping_dictionary(dict_any_reac_id_to_fluxer_id,
-                                                                                               dict_fluxer_id_to_reac_prop,
+    dict_any_reac_id_to_mergem_id, dict_mergem_id_to_reac_prop = __clean_id_mapping_dictionary(dict_any_reac_id_to_mergem_id,
+                                                                                               dict_mergem_id_to_reac_prop,
                                                                                                for_reac=True)
 
     __log("Creating reaction id pickle")
     with open(pickle_dir + 'reactionIdMapper.p', 'wb') as file:
-        dump(dict_any_reac_id_to_fluxer_id, file)
+        dump(dict_any_reac_id_to_mergem_id, file)
 
     __log("Creating reaction info pickle")
     with open(pickle_dir + 'reactionInfo.p', 'wb') as file:
-        dump(dict_fluxer_id_to_reac_prop, file)
+        dump(dict_mergem_id_to_reac_prop, file)
 
     __log("Cleaning metabolite id dictionary")
-    dict_any_met_id_to_fluxer_id, dict_fluxer_id_to_met_prop = __clean_id_mapping_dictionary(dict_any_met_id_to_fluxer_id,
-                                                                                             dict_fluxer_id_to_met_prop)
+    dict_any_met_id_to_mergem_id, dict_mergem_id_to_met_prop = __clean_id_mapping_dictionary(dict_any_met_id_to_mergem_id,
+                                                                                             dict_mergem_id_to_met_prop)
 
     __log("Creating metabolite id pickle")
     with open(pickle_dir + 'metaboliteIdMapper.p', 'wb') as file:
-        dump(dict_any_met_id_to_fluxer_id, file)
+        dump(dict_any_met_id_to_mergem_id, file)
 
     __log("Creating metabolite info pickle")
     with open(pickle_dir + 'metaboliteInfo.p', 'wb') as file:
-        dump(dict_fluxer_id_to_met_prop, file)
+        dump(dict_mergem_id_to_met_prop, file)
 
     toc = perf_counter()
     __log("")
@@ -1054,11 +1054,11 @@ def __return_mapping_and_info_dicts():
 
     for filename in pickle_filenames:
         if not os.path.exists(pickle_dir + filename):
-            global dict_any_reac_id_to_fluxer_id, dict_fluxer_id_to_reac_prop, dict_any_met_id_to_fluxer_id, \
-                dict_fluxer_id_to_met_prop
+            global dict_any_reac_id_to_mergem_id, dict_mergem_id_to_reac_prop, dict_any_met_id_to_mergem_id, \
+                dict_mergem_id_to_met_prop
             __create_id_mapping_pickle()
-            return [dict_any_reac_id_to_fluxer_id, dict_fluxer_id_to_reac_prop, dict_any_met_id_to_fluxer_id,
-                    dict_fluxer_id_to_met_prop]
+            return [dict_any_reac_id_to_mergem_id, dict_mergem_id_to_reac_prop, dict_any_met_id_to_mergem_id,
+                    dict_mergem_id_to_met_prop]
         else:
             f = open(pickle_dir + filename, "rb")
             mapping_or_info_dict = load(f)

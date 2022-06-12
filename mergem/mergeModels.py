@@ -1,5 +1,5 @@
 """
-    Uses Fluxer dictionaries to translate models to common namespace
+    Uses mergem dictionaries to translate models to common namespace
     and then merges the models to remove metabolite and reaction
     duplicates.
     Resulting model can be FBA simulated.
@@ -71,11 +71,11 @@ def merge(list_of_inputs, set_objective='merge'):
         model_mets = {}
         update_reactions = []
         for met in model.metabolites:
-            met_fluxer_id = __modelHandling.create_fluxer_metabolite_id(met)
-            if met_fluxer_id not in model_mets:
-                model_mets[met_fluxer_id] = met.copy()
+            met_mergem_id = __modelHandling.create_mergem_metabolite_id(met)
+            if met_mergem_id not in model_mets:
+                model_mets[met_mergem_id] = met.copy()
             else:
-                existing_met = model.metabolites.get_by_id(model_mets[met_fluxer_id].id)
+                existing_met = model.metabolites.get_by_id(model_mets[met_mergem_id].id)
                 if existing_met.reactions != met.reactions:
                     for reaction in met.reactions:
                         if met in reaction.metabolites:
@@ -109,7 +109,7 @@ def merge(list_of_inputs, set_objective='merge'):
 
             else:
                 for reaction_met in reaction.metabolites: # processing metabolic reactions that are not in objective
-                    new_met_id = __modelHandling.create_fluxer_metabolite_id(reaction_met)
+                    new_met_id = __modelHandling.create_mergem_metabolite_id(reaction_met)
 
                     if new_met_id is not None:
                         if new_met_id in met_source_dict:
@@ -155,7 +155,7 @@ def merge(list_of_inputs, set_objective='merge'):
     met_source_cleaned = {}
     for metabolite_id in met_source_dict.keys():
         source_set = met_source_dict[metabolite_id]
-        if "fluxer" in metabolite_id:  # Only revert fluxer IDs
+        if "mergem" in metabolite_id:  # Only revert mergem IDs
             met_source_cleaned[met_model_id_dict[metabolite_id][0]] = source_set
         else:
             met_source_cleaned[metabolite_id] = source_set

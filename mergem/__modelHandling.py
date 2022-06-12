@@ -1,5 +1,5 @@
 """
-    Functions to handle cobra models including transforming metabolite IDs to fluxer namespace,
+    Functions to handle cobra models including transforming metabolite IDs to mergem namespace,
     creating reaction keys to compare them better, calculating jaccard distances, and
     loading and exporting cobra models.
 
@@ -13,16 +13,16 @@ import os
 from . import __database_id_merger
 
 curr_dir = os.path.dirname(__file__)
-__fluxer_met_id_dict, __fluxer_met_info_dict = {}, {}
+__mergem_met_id_dict, __mergem_met_info_dict = {}, {}
 
 
-# To convert model met ID to fluxer ID
+# To convert model met ID to mergem ID
 def __load_or_create_id_mapper():
     """
     Checks if metabolite id mapper exists in current directory, else downloads the latest database files,
     merges the database identifiers based on common properties and saves the mapping table as a pickle.
     """
-    global __fluxer_met_id_dict, __fluxer_met_info_dict
+    global __mergem_met_id_dict, __mergem_met_info_dict
     met_conv_file = "metaboliteIdMapper.p"
     met_info_file = 'metaboliteInfo.p'
     met_conv_pickle_path = os.path.join(curr_dir, "data", met_conv_file)
@@ -30,18 +30,18 @@ def __load_or_create_id_mapper():
 
     if (os.path.exists(met_conv_pickle_path)) and (os.path.exists(met_info_pickle_path)):
         f = open(met_conv_pickle_path, "rb")
-        __fluxer_met_id_dict = load(f)
+        __mergem_met_id_dict = load(f)
         f.close()
 
         f = open(met_info_pickle_path, "rb")
-        __fluxer_met_info_dict = load(f)
+        __mergem_met_info_dict = load(f)
         f.close()
 
     else:
         print("Building ID mapping and metabolite Info table.")
         __database_id_merger.__create_id_mapping_pickle()
-        __fluxer_met_id_dict = __database_id_merger.__return_mapping_and_info_dicts()[2]
-        __fluxer_met_info_dict = __database_id_merger.__return_mapping_and_info_dicts()[3]
+        __mergem_met_id_dict = __database_id_merger.__return_mapping_and_info_dicts()[2]
+        __mergem_met_info_dict = __database_id_merger.__return_mapping_and_info_dicts()[3]
 
 
 def __update_id_mapping_pickles():
@@ -52,23 +52,23 @@ def __update_id_mapping_pickles():
     __database_id_merger.__create_id_mapping_pickle()
 
 
-# returns fluxer identifier for a metabolite
-def __get_fluxer_id(db_id):
+# returns mergem identifier for a metabolite
+def __get_mergem_id(db_id):
     """
-    Returns fluxer_id from metabolite ID mapping dictionary.
+    Returns mergem_id from metabolite ID mapping dictionary.
     :param db_id: External database id from model
-    :return: metabolite fluxer_id, if exists else None
+    :return: metabolite mergem_id, if exists else None
     """
-    fluxer_id = __fluxer_met_id_dict.get(db_id)
+    mergem_id = __mergem_met_id_dict.get(db_id)
 
-    if fluxer_id is None:
+    if mergem_id is None:
         if '@' in db_id:
             split_db_id = db_id.rsplit('@', 1)[0]
         else:
             split_db_id = db_id.rsplit("_", 1)[0]
-        fluxer_id = __fluxer_met_id_dict.get(split_db_id)
+        mergem_id = __mergem_met_id_dict.get(split_db_id)
 
-    return fluxer_id
+    return mergem_id
 
 
 # convert cellular localization to single namespace
@@ -107,14 +107,14 @@ def __create_reaction_key(reaction, reverse=False):
     reac_metabolite_set = set()
     reac_rev_met_set = set()
     for reactant in reaction.reactants:
-        if ('fluxer_78_' not in reactant.id) and (reactant.id[-1] != 'b') and (reactant.name != "PMF"):
+        if ('mergem_78_' not in reactant.id) and (reactant.id[-1] != 'b') and (reactant.name != "PMF"):
             metabolite_set = (reactant.id, -1)
             rev_met_set = (reactant.id, 1)
             reac_metabolite_set.add(metabolite_set)
             reac_rev_met_set.add(rev_met_set)
 
     for product in reaction.products:
-        if ('fluxer_78_' not in product.id) and (product.id[-1] != 'b') and (product.name != "PMF"):
+        if ('mergem_78_' not in product.id) and (product.id[-1] != 'b') and (product.name != "PMF"):
             metabolite_set = (product.id, 1)
             rev_met_set = (product.id, -1)
             reac_metabolite_set.add(metabolite_set)
@@ -125,17 +125,17 @@ def __create_reaction_key(reaction, reverse=False):
 
     return reac_metabolite_set, reac_rev_met_set
 
-# returns a metabolite id in fluxer namespace with cellular localization
-def create_fluxer_metabolite_id(metabolite):
+# returns a metabolite id in mergem namespace with cellular localization
+def create_mergem_metabolite_id(metabolite):
     """
-    Takes a metabolite object as input and returns fluxer_id notation for metabolite
+    Takes a metabolite object as input and returns mergem_id notation for metabolite
     :param metabolite: Cobra metabolite object
-    :return: Fluxer_id notation for the metabolite
+    :return: mergem_id notation for the metabolite
     """
-    met_fluxer_id = __get_fluxer_id(metabolite.id)
+    met_mergem_id = __get_mergem_id(metabolite.id)
     met_compartment = get_localization(metabolite.compartment)
 
-    if met_fluxer_id is not None:
+    if met_mergem_id is not None:
         if (met_compartment == '') & ('_' in metabolite.id):
             if '@' in metabolite.id:
                 met_compartment = get_localization(metabolite.id.rsplit('@', 1)[1])
@@ -143,11 +143,11 @@ def create_fluxer_metabolite_id(metabolite):
                 met_compartment = get_localization(metabolite.id.rsplit("_", 1)[1])
 
             if met_compartment != '':
-                met_id = "fluxer_" + str(met_fluxer_id) + "_" + met_compartment
+                met_id = "mergem_" + str(met_mergem_id) + "_" + met_compartment
                 return met_id
 
         elif met_compartment != '':
-            met_id = "fluxer_" + str(met_fluxer_id) + "_" + met_compartment
+            met_id = "mergem_" + str(met_mergem_id) + "_" + met_compartment
             return met_id
 
     return None
@@ -189,18 +189,18 @@ def __create_merged_objective(input_merged_model, list_of_obj_reac_lists):
 def __convert_template_to_merged_model(model, merged_model_id, dict_met_id_conv):
     """
     Restore model identifiers from model id conv dict
-    :param model: merged model in fluxer namespace
+    :param model: merged model in mergem namespace
     :param merged_model_id: model id for merged model
-    :param dict_met_id_conv: dictionary mapping fluxer ids to original model ids
+    :param dict_met_id_conv: dictionary mapping mergem ids to original model ids
     :return: merged model in original model id namespace
     """
-    global __fluxer_met_info_dict
+    global __mergem_met_info_dict
     merged_model = Model(merged_model_id)
 
     for reaction in model.reactions:
         reaction_copy = reaction.copy()
         for metabolite in reaction_copy.metabolites:
-            if "fluxer" in metabolite.id:  # Only revert fluxer IDs
+            if "mergem" in metabolite.id:  # Only revert mergem IDs
                 new_met_id = dict_met_id_conv[metabolite.id][0]
                 if new_met_id not in reaction_copy.metabolites:
                     metabolite.id  = new_met_id
