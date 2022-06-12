@@ -1,6 +1,6 @@
 mergem
 ======
-mergem is a python package for the Unification of Cobra Reconstructions and genome-scale metabolic models.  
+mergem is a python package for merging genome-scale metabolic models.
 The package can be used as a command-line tool or can be imported within a python script.
 
 ------
@@ -58,20 +58,24 @@ the metabolite and reaction jaccard distances of each model with respect to firs
 metabolite and reaction model sources. 
 
 ------
+Citation
+======
+Please cite mergem using:
+* [mergem: A python package for the unification of genome scale metabolic models](doi:)
 
+------
+
+------
 Acknowledgements 
 ======
 
-This package was developed at [The Lobo lab](https://lobolab.umbc.edu), University of Maryland Baltimore County.
+This package was developed at [The Lobo Lab](https://lobolab.umbc.edu), University of Maryland Baltimore County.
 
 ------
 
 References
 ======
-The following publications detail the implementation and usage of mergem package  
-* mergem: A python package for the unification of genome scale metabolic models. [Ref](doi:)
-
-The following publications have contributed towards the implementation of this package:
+The following publications have contributed towards the development of this package:
 * [Fluxer: a web application to compute and visualize genome-scale metabolic flux networks](https://doi.org/10.1093/nar/gkaa409).
 * [COBRApy: COnstraints-Based Reconstruction and Analysis for Python](http://dx.doi.org/doi:10.1186/1752-0509-7-74).
 
@@ -79,8 +83,8 @@ The following publications have contributed towards the implementation of this p
 
 License
 ======
-This package is under GNU GENERAL PUBLIC LICENSE. The package is free for academic use, 
-without any express or implied warranty. In no event will the authors be held liable for any damages arising from the 
+This package is under GNU GENERAL PUBLIC LICENSE. The package is free for use without any express or implied warranty.
+In no event will the authors be held liable for any damages arising from the
 use of this software. Permission is granted to anyone to use this software for any purpose, 
 subject to the following restrictions:
 
