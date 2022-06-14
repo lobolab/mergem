@@ -82,7 +82,7 @@ def main(input_filenames, obj, o=None, v=False, up=False):
         sys.exit()
 
     if print_stats:
-        click.echo("Model (Met, Reac) jaccard distances: {}".format(merge_results['jacc_d']))
+        click.echo("Jaccard distance matrix: {}".format(merge_results['jacc_d']))
         click.echo("Mets merged: {}". format(merge_results['Met_merged']))
         click.echo("Reacs merged: {}".format(merge_results['Reac_merged']))
 

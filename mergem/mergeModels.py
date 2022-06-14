@@ -149,8 +149,8 @@ def merge(list_of_inputs, set_objective='merge'):
 
         list_of_objective_reactions.append(list_model_objectives)
 
-    jacc_matrix_met, jacc_matrix_reac = __modelHandling.__create_jaccard_matrix(len(cleaned_models), met_source_dict,
-                                                                                reac_source_dict)
+    jacc_matrix = __modelHandling.__create_jaccard_matrix(len(cleaned_models), met_source_dict,
+                                                          reac_source_dict)
 
     met_source_cleaned = {}
     for metabolite_id in met_source_dict.keys():
@@ -174,7 +174,7 @@ def merge(list_of_inputs, set_objective='merge'):
     merged_model.repair()
 
     result['merged_model'] = merged_model
-    result['jacc_d'] = [jacc_matrix_met, jacc_matrix_reac]
+    result['jacc_d'] = jacc_matrix
     result['Met_merged'] = total_mets_merged
     result['Reac_merged'] = total_reacs_merged
     result['Met_sources'] = met_and_reac_sources[0]

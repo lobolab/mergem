@@ -314,7 +314,7 @@ def __create_jaccard_matrix(num_models, met_source_dict, reac_source_dict):
     """
     met_uniq_num = [0] * num_models
     reac_uniq_num = [0] * num_models
-    jacc_matrix_met, jacc_matrix_reac = [], []
+    jacc_matrix = []
     total_mets_merged, total_reacs_merged = 0, 0
 
     for met_sources in met_source_dict.values():
@@ -330,30 +330,31 @@ def __create_jaccard_matrix(num_models, met_source_dict, reac_source_dict):
             reac_uniq_num[list(reac_sources)[0]] += 1
 
     for i in range(0, num_models):
-        jd_row_met, jd_row_reac = [], []
+        jd_row = []
         for j in range(0, num_models):
             num_met_merged = 0
             num_reac_merged = 0
 
-            if i != j:
-                for met_source in met_source_dict.values():
-                    if (i in met_source) and (j in met_source):
-                        num_met_merged += 1
+            if i > j:
                 for reac_source in reac_source_dict.values():
                     if (i in reac_source) and (j in reac_source):
                         num_reac_merged += 1
 
-                jd_row_met += [__calculate_jaccard_distance(met_uniq_num[i], num_met_merged, met_uniq_num[j])]
-                jd_row_reac += [__calculate_jaccard_distance(reac_uniq_num[i], num_met_merged, reac_uniq_num[j])]
+                jd_row += [__calculate_jaccard_distance(reac_uniq_num[i], num_reac_merged, reac_uniq_num[j])]
+
+            elif i < j:
+                for met_source in met_source_dict.values():
+                    if (i in met_source) and (j in met_source):
+                        num_met_merged += 1
+
+                jd_row += [__calculate_jaccard_distance(met_uniq_num[i], num_met_merged, met_uniq_num[j])]
 
             else:
-                jd_row_met += [0]
-                jd_row_reac += [0]
+                jd_row += [0]
 
-        jacc_matrix_met += [jd_row_met]
-        jacc_matrix_reac += [jd_row_reac]
+        jacc_matrix += [jd_row]
 
-    return jacc_matrix_met, jacc_matrix_reac
+    return jacc_matrix
 
 
 def __calculate_jaccard_distance(num_reference, num_merged, num_unique):
