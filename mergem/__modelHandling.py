@@ -125,6 +125,7 @@ def __create_reaction_key(reaction, reverse=False):
 
     return reac_metabolite_set, reac_rev_met_set
 
+
 # returns a metabolite id in mergem namespace with cellular localization
 def create_mergem_metabolite_id(metabolite):
     """
@@ -163,22 +164,26 @@ def __create_merged_objective(input_merged_model, list_of_obj_reac_lists):
     """
     merged_reaction = Reaction('merged_objectives')
     st_dict = {}
+    metabolite_dict, obj_mets_dict = {}, {}
 
     for reaction_list in list_of_obj_reac_lists:
         for reaction in reaction_list:
             for metabolite in reaction.metabolites:
                 if metabolite.id not in st_dict:
                     st_dict[metabolite.id] = set()
+
+                if metabolite.id not in metabolite_dict:
+                    metabolite_dict[metabolite.id] = metabolite.copy()
+
                 st_dict[metabolite.id] |= {reaction.metabolites[metabolite]}
 
             merged_reaction.name += reaction.id + "; "
 
     for metabolite_id, met_stoichiometries in st_dict.items():
-        copy_met = input_merged_model.metabolites.get_by_id(metabolite_id).copy()
         avg_stoichiometry = sum(met_stoichiometries)/len(met_stoichiometries)
-        merged_reaction.add_metabolites({copy_met: avg_stoichiometry})
+        merged_reaction.add_metabolites({metabolite_dict[metabolite_id]: avg_stoichiometry})
 
-    if len(merged_reaction.metabolites) > 1:
+    if len(merged_reaction.metabolites) > 0:
         input_merged_model.add_reactions({merged_reaction})
         input_merged_model.objective = merged_reaction.id
 
