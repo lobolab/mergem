@@ -15,6 +15,17 @@ from . import __database_id_merger
 curr_dir = os.path.dirname(__file__)
 __mergem_met_id_dict, __mergem_met_info_dict = {}, {}
 
+localization_dict = {'p': 'p', 'p0': 'p', 'periplasm': 'p', 'periplasm_0': 'p', 'mnxc19': 'p',
+                     'c': 'c', 'c0': 'c', 'cytosol': 'c', 'cytosol_0': 'c', 'cytoplasm': 'c', 'mnxc3': 'c',
+                     'cytoplasm_0': 'c',
+                     'e': 'e', 'e0': 'e', 'extracellular': 'e', 'extracellular_0': 'e',
+                     'extracellular space': 'e', 'mnxc2': 'e',
+                     'm': 'm', 'mitochondria': 'm', 'mitochondria_0': 'm', 'mnxc4': 'm',
+                     'b': 'b', 'boundary': 'b',
+                     'x': 'p/glyoxysome', 'mnxc24': 'p/glyoxysome', 'mnxc13': 'p/glyoxysome',
+                     'h': 'h', 'choloroplast': 'h', 'mnxc8': 'h',
+                     'v': 'v', 'vacuole': 'v', 'mnxc9': 'v',
+                     'n': 'n', 'nucleus': 'n', 'mnxc6': 'n'}
 
 # To convert model met ID to mergem ID
 def __load_or_create_id_mapper():
@@ -72,24 +83,12 @@ def __get_mergem_id(db_id):
 
 
 # convert cellular localization to single namespace
-def get_localization(id_or_model_localization):
+def map_localization(id_or_model_localization):
     """
     Converts localization suffixes into common notation.
     :param id_or_model_localization: cellular localization of entity in model
     :return: single letter cellular localization
     """
-    localization_dict = {'p': 'p', 'p0': 'p', 'periplasm': 'p', 'periplasm_0': 'p', 'mnxc19': 'p',
-                         'c': 'c', 'c0': 'c', 'cytosol': 'c', 'cytosol_0': 'c', 'cytoplasm': 'c', 'mnxc3': 'c',
-                         'cytoplasm_0': 'c',
-                         'e': 'e', 'e0': 'e', 'extracellular': 'e', 'extracellular_0': 'e',
-                         'extracellular space': 'e', 'mnxc2': 'e',
-                         'm': 'm', 'mitochondria': 'm', 'mitochondria_0': 'm', 'mnxc4': 'm',
-                         'b': 'b', 'boundary': 'b',
-                         'x': 'p/glyoxysome', 'mnxc24': 'p/glyoxysome', 'mnxc13': 'p/glyoxysome',
-                         'h': 'h', 'choloroplast': 'h', 'mnxc8': 'h',
-                         'v': 'v', 'vacuole': 'v', 'mnxc9': 'v',
-                         'n': 'n', 'nucleus': 'n', 'mnxc6': 'n'}
-
     localization = localization_dict.get(id_or_model_localization.lower(), '')
 
     return localization
@@ -127,21 +126,21 @@ def __create_reaction_key(reaction, reverse=False):
 
 
 # returns a metabolite id in mergem namespace with cellular localization
-def create_mergem_metabolite_id(metabolite):
+def map_to_metabolite_mergem_id(metabolite):
     """
     Takes a metabolite object as input and returns mergem_id notation for metabolite
     :param metabolite: Cobra metabolite object
     :return: mergem_id notation for the metabolite
     """
     met_mergem_id = __get_mergem_id(metabolite.id)
-    met_compartment = get_localization(metabolite.compartment)
+    met_compartment = map_localization(metabolite.compartment)
 
     if met_mergem_id is not None:
         if (met_compartment == '') & ('_' in metabolite.id):
             if '@' in metabolite.id:
-                met_compartment = get_localization(metabolite.id.rsplit('@', 1)[1])
+                met_compartment = map_localization(metabolite.id.rsplit('@', 1)[1])
             else:
-                met_compartment = get_localization(metabolite.id.rsplit("_", 1)[1])
+                met_compartment = map_localization(metabolite.id.rsplit("_", 1)[1])
 
             if met_compartment != '':
                 met_id = "mergem_" + str(met_mergem_id) + "_" + met_compartment

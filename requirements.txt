@@ -1,0 +1,4 @@
+click>=8.0.3
+cobra>=0.22.1
+setuptools>=59.2.0
+requests>=2.26.0

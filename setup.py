@@ -3,7 +3,7 @@ from setuptools import setup
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
-version = '0.8'
+exec(open("./mergem/__version.py").read())
 
 setup(name='mergem',
       version=version,
@@ -11,7 +11,7 @@ setup(name='mergem',
       long_description=long_description,
       long_description_content_type="text/markdown",
       url='https://github.com/lobolab/mergem',
-      author='Lobo lab',
+      author='Lobo Lab',
       author_email='lobolab@umbc.edu',
       maintainer='Archana Hari',
       maintainer_email="archh1@umbc.edu",
