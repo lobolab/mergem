@@ -45,7 +45,7 @@ def merge(list_of_inputs, set_objective='merge'):
     for mod_input in list_of_inputs:
         if isinstance(mod_input, str):
             try:
-                input_model = __modelHandling.__load_model(mod_input)
+                input_model = __modelHandling.load_model(mod_input)
                 list_of_models.append(input_model)
 
             except Exception as e:
@@ -174,10 +174,10 @@ def merge(list_of_inputs, set_objective='merge'):
     merged_model.repair()
 
     result['merged_model'] = merged_model
-    result['jacc_d'] = jacc_matrix
-    result['Met_merged'] = total_mets_merged
-    result['Reac_merged'] = total_reacs_merged
-    result['Met_sources'] = met_and_reac_sources[0]
-    result['Reac_sources'] = met_and_reac_sources[1]
+    result['jacc_matrix'] = jacc_matrix
+    result['num_met_merged'] = total_mets_merged
+    result['num_reac_merged'] = total_reacs_merged
+    result['met_sources'] = met_and_reac_sources[0]
+    result['reac_sources'] = met_and_reac_sources[1]
 
     return result

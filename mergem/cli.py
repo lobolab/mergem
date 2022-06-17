@@ -8,16 +8,15 @@
     Copyright (c) Lobo Lab (https://lobolab.umbc.edu)
 """
 import click
-from . import __version
-from . import __modelHandling
-from .mergeModels import merge, update_id_mapper
 import sys
 import os
+import mergem
+from . import __version
 
 allowed_file_formats = ["sbml", "xml", "mat", "m", "matlab", "json", "yaml"]
 
 
-@click.command()
+@click.command(no_args_is_help=True)
 @click.argument('input_filenames', nargs=-1, type=click.Path(exists=True))
 @click.option('-obj', nargs=1, default='merge',
               help="Set objective: 'merge' all objectives (default) or 1, 2, 3.. (objective from one of the input models)")
@@ -28,8 +27,10 @@ allowed_file_formats = ["sbml", "xml", "mat", "m", "matlab", "json", "yaml"]
 def main(input_filenames, obj, o=None, v=False, up=False):
     """
     mergem takes genome-scale metabolic models as input, merges them into a single model
-    and saves merged model as .xml. Users can optionally select the objective and provide
-    an output filename for merged model.
+    and saves the merged model as .xml. Users can optionally select the objective and provide
+    an output filename for the merged model.
+
+    Lobo Lab (https://lobolab.umbc.edu)
     """
     model_filenames = input_filenames
     objective = obj
@@ -37,13 +38,12 @@ def main(input_filenames, obj, o=None, v=False, up=False):
     print_stats = v
     input_list_of_models = []
 
-    click.secho(f"mergem, {__version.version}")
-    click.secho("Lobo Lab (https://lobolab.umbc.edu)")
+    click.secho(f"mergem, v{__version.version}")
 
     if up:
-        click.secho('Updating Metabolite ID mapper. This process may take a few hours.. ')
-        update_id_mapper()
-        click.secho('Metabolite ID mapper updated. ', fg='green')
+        click.secho('Updating ID mapper. This process may take a few hours.. ')
+        mergem.update_id_mapper()
+        click.secho('ID mapper updated. ', fg='green')
         if len(model_filenames) == 0:
             sys.exit()
 
@@ -63,30 +63,30 @@ def main(input_filenames, obj, o=None, v=False, up=False):
 
     for filename in model_filenames:
         try:
-            input_model = __modelHandling.__load_model(filename)
+            input_model = mergem.load_model(filename)
         except Exception as e:
             click.secho(e, fg='red')
             sys.exit()
         input_list_of_models.append(input_model)
 
-    merge_results = merge(input_list_of_models, objective)
+    merge_results = mergem.merge(input_list_of_models, objective)
     result_merged_model = merge_results['merged_model']
 
     try:
         if output_filename is None:
             output_filename = result_merged_model.id + ".xml"
-        __modelHandling.__export_merged_model(result_merged_model, output_filename)
+        mergem.save_model(result_merged_model, output_filename)
 
     except Exception as e:
         click.secho(e, fg='red')
         sys.exit()
 
-    if print_stats:
-        click.echo("Jaccard distance matrix: {}".format(merge_results['jacc_d']))
-        click.echo("Mets merged: {}". format(merge_results['Met_merged']))
-        click.echo("Reacs merged: {}".format(merge_results['Reac_merged']))
-
     click.secho(f"\nMerging models complete. Merged model saved as {output_filename}", fg="green")
+
+    if print_stats:
+        click.echo("Jaccard distance matrix: {}".format(merge_results['jacc_matrix']))
+        click.echo("Metabolites merged: {}". format(merge_results['num_met_merged']))
+        click.echo("Reactions merged: {}".format(merge_results['num_reac_merged']))
 
 
 if __name__ == "__main__":

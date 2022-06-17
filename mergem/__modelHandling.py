@@ -257,7 +257,7 @@ def __set_to_list_source_dict(dict_source):
 
 
 # loads and returns cobra model based on file format
-def __load_model(filename):
+def load_model(filename):
     """
     Loads a model from the given filename/path.
     :param filename: Name of file to load model from.
@@ -282,8 +282,8 @@ def __load_model(filename):
     return cobra_model
 
 
-# saves the merged model in xml format
-def __export_merged_model(cobra_model, file_name):
+# saves a cobra model in a file with appropriate format
+def save_model(cobra_model, file_name):
     """
     Takes a cobra model as input and exports as file_name.
     :param cobra_model: cobra model to be saved.
