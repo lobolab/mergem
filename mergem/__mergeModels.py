@@ -58,7 +58,6 @@ def merge(list_of_inputs, set_objective='merge'):
     list_of_objective_reactions = []
     met_source_dict, reac_source_dict, met_model_id_dict = {}, {}, {}
     merged_model_reactions = {}
-    total_mets_merged, total_reacs_merged = 0, 0
     met_and_reac_sources = []
 
     merged_model_id = 'merged_'
@@ -149,8 +148,10 @@ def merge(list_of_inputs, set_objective='merge'):
 
         list_of_objective_reactions.append(list_model_objectives)
 
-    jacc_matrix = __modelHandling.__create_jaccard_matrix(len(cleaned_models), met_source_dict,
-                                                          reac_source_dict)
+    jacc_matrix = __create_jaccard_matrix(len(cleaned_models), met_source_dict, reac_source_dict)
+
+    num_mets_merged = sum([len(model.metabolites) for model in list_of_models]) - len(met_source_dict)
+    num_reacs_merged = sum([len(model.reactions) for model in list_of_models]) - len(reac_source_dict)
 
     met_source_cleaned = {}
     for metabolite_id in met_source_dict.keys():
@@ -175,9 +176,51 @@ def merge(list_of_inputs, set_objective='merge'):
 
     result['merged_model'] = merged_model
     result['jacc_matrix'] = jacc_matrix
-    result['num_met_merged'] = total_mets_merged
-    result['num_reac_merged'] = total_reacs_merged
+    result['num_met_merged'] = num_mets_merged
+    result['num_reac_merged'] = num_reacs_merged
     result['met_sources'] = met_and_reac_sources[0]
     result['reac_sources'] = met_and_reac_sources[1]
 
     return result
+
+
+def __create_jaccard_matrix(num_models, met_source_dict, reac_source_dict):
+    """
+    Creates Jaccard distances matrix using dictionaries with source of each metabolite
+    and reaction in merged model.
+    :param num_models: number of input models
+    :param met_source_dict: dictionary with source of each metabolite
+    :param reac_source_dict: dictionary with source of each reaction
+    :return: Jaccard distance matrices for metabolites and reactions
+    """
+    jacc_matrix = []
+
+    model_met_mergem_ids = []
+    model_reac_mergem_ids = []
+    for i in range(0, num_models):
+        model_met_mergem_ids.append({id for id,model_set in met_source_dict.items() if i in model_set})
+        model_reac_mergem_ids.append({id for id,model_set in reac_source_dict.items() if i in model_set})
+
+    for i in range(0, num_models):
+        jd_row = []
+        for j in range(0, num_models):
+            if i > j:
+                union = len(model_reac_mergem_ids[i] | model_reac_mergem_ids[j])
+                if union == 0:
+                    jd_row += [0]
+                else:
+                    jd_row +=  [1 - (len(model_reac_mergem_ids[i] & model_reac_mergem_ids[j]) / union)]
+
+            elif i < j:
+                union = len(model_met_mergem_ids[i] | model_met_mergem_ids[j])
+                if union == 0:
+                    jd_row += [0]
+                else:
+                    jd_row +=  [1 - (len(model_met_mergem_ids[i] & model_met_mergem_ids[j]) / union)]
+
+            else:
+                jd_row += [0]
+
+        jacc_matrix += [jd_row]
+
+    return jacc_matrix
