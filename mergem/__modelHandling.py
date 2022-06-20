@@ -63,25 +63,6 @@ def __update_id_mapping_pickles():
     __database_id_merger.__create_id_mapping_pickle()
 
 
-# returns mergem identifier for a metabolite
-def __get_mergem_id(db_id):
-    """
-    Returns mergem_id from metabolite ID mapping dictionary.
-    :param db_id: External database id from model
-    :return: metabolite mergem_id, if exists else None
-    """
-    mergem_id = __mergem_met_id_dict.get(db_id)
-
-    if mergem_id is None:
-        if '@' in db_id:
-            split_db_id = db_id.rsplit('@', 1)[0]
-        else:
-            split_db_id = db_id.rsplit("_", 1)[0]
-        mergem_id = __mergem_met_id_dict.get(split_db_id)
-
-    return mergem_id
-
-
 # convert cellular localization to single namespace
 def map_localization(id_or_model_localization):
     """
@@ -132,25 +113,24 @@ def map_to_metabolite_mergem_id(metabolite):
     :param metabolite: Cobra metabolite object
     :return: mergem_id notation for the metabolite
     """
-    met_mergem_id = __get_mergem_id(metabolite.id)
-    met_compartment = map_localization(metabolite.compartment)
+    met_mergem_id = __mergem_met_id_dict.get(metabolite.id)
+
+    if met_mergem_id is None:
+        if '@' in metabolite.id:
+            split = metabolite.id.rsplit('@', 1)
+        else:
+            split = metabolite.id.rsplit("_", 1)
+        met_mergem_id =  __mergem_met_id_dict.get(split[0])
+
 
     if met_mergem_id is not None:
-        if (met_compartment == '') & ('_' in metabolite.id):
-            if '@' in metabolite.id:
-                met_compartment = map_localization(metabolite.id.rsplit('@', 1)[1])
-            else:
-                met_compartment = map_localization(metabolite.id.rsplit("_", 1)[1])
+        met_compartment = map_localization(metabolite.compartment)
+        if (met_compartment == ''):
+            met_compartment = map_localization(split[1])
 
-            if met_compartment != '':
-                met_id = "mergem_" + str(met_mergem_id) + "_" + met_compartment
-                return met_id
+        met_mergem_id = "mergem_" + str(met_mergem_id) + "_" + met_compartment
 
-        elif met_compartment != '':
-            met_id = "mergem_" + str(met_mergem_id) + "_" + met_compartment
-            return met_id
-
-    return None
+    return met_mergem_id
 
 
 # create a reaction that contains input model objective reacs merged together
@@ -189,37 +169,6 @@ def __create_merged_objective(input_merged_model, list_of_obj_reac_lists):
     return input_merged_model
 
 
-# Creates a model containing the merged reactions and metabolites in original namespaces
-def __convert_template_to_merged_model(model, merged_model_id, dict_met_id_conv):
-    """
-    Restore model identifiers from model id conv dict
-    :param model: merged model in mergem namespace
-    :param merged_model_id: model id for merged model
-    :param dict_met_id_conv: dictionary mapping mergem ids to original model ids
-    :return: merged model in original model id namespace
-    """
-    global __mergem_met_info_dict
-    merged_model = Model(merged_model_id)
-
-    for reaction in model.reactions:
-        reaction_copy = reaction.copy()
-        for metabolite in reaction_copy.metabolites:
-            if "mergem" in metabolite.id:  # Only revert mergem IDs
-                new_met_id = dict_met_id_conv[metabolite.id][0]
-                if new_met_id not in reaction_copy.metabolites:
-                    metabolite.id  = new_met_id
-                else:
-                    uniq_ids = [model_id for model_id in dict_met_id_conv[metabolite.id]
-                                if model.metabolites.get_by_id(model_id) not in reaction.metabolites]
-                    if len(uniq_ids) > 0:
-                        metabolite.id = uniq_ids[0]
-        merged_model.add_reactions([reaction_copy])
-
-    merged_model.objective = model.objective
-
-    return merged_model
-
-
 # sets the objective for merged model
 def __set_objective_expression(merged_model, list_of_models, list_of_obj_reacs, set_objective):
     """
@@ -236,24 +185,9 @@ def __set_objective_expression(merged_model, list_of_models, list_of_obj_reacs, 
 
     else:
         model_num = int(set_objective) - 1
-        for reaction in list_of_obj_reacs[model_num]:
-            merged_model.add_reactions({reaction.copy()})
+        merged_model.add_reactions(list_of_obj_reacs[model_num])
         merged_model.objective = list_of_models[model_num].objective.expression
         return merged_model
-
-
-# converts source model sets into lists
-def __set_to_list_source_dict(dict_source):
-    """
-    Converts set values in dictionary to lists.
-    :param dict_source: Dictionary with set values
-    :return: Dictionary with list values
-    """
-    new_dict_of_sources = {}
-    for key, value in dict_source.items():
-        new_dict_of_sources[key] = list(value)
-
-    return new_dict_of_sources
 
 
 # loads and returns cobra model based on file format
@@ -302,21 +236,5 @@ def save_model(cobra_model, file_name):
         raise IOError('Unable to save merged model. Check file format {}'.format(file_name))
 
 
-# adding genes to merged reactions
-def __update_gene_rule(existing_reaction, new_reaction):
-    """
-    Updates the gene rule for existing reaction from new reaction.
-    :param existing_reaction: cobra reaction object that exists in model
-    :param new_reaction: cobra reaction model that is being merged
-    :return: a gene rule that includes rule from new reaction
-    """
-    if (existing_reaction.gene_reaction_rule == '') and (new_reaction.gene_reaction_rule != ''):
-        updated_gene_rule = new_reaction.gene_reaction_rule
-    elif (existing_reaction.gene_reaction_rule != '') and (new_reaction.gene_reaction_rule == ''):
-        updated_gene_rule = existing_reaction.gene_reaction_rule
-    elif (existing_reaction.gene_reaction_rule != '') and (new_reaction.gene_reaction_rule != ''):
-        updated_gene_rule = existing_reaction.gene_reaction_rule + ' or ' + new_reaction.gene_reaction_rule
-    else:
-        updated_gene_rule = ''
-
-    return updated_gene_rule
+# Initialize mapper
+__load_or_create_id_mapper()
