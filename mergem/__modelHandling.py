@@ -142,27 +142,25 @@ def map_to_metabolite_mergem_id(metabolite):
 
 
 # create a reaction that contains input model objective reacs merged together
-def __create_merged_objective(input_merged_model, list_of_obj_reac_lists):
+def __create_merged_objective(merged_model, objective_reactions):
     """
     Merges objective reactions in list and sets as objective in input merged model.
-    :param input_merged_model: Merged model to set objective of
-    :param list_of_obj_reac_lists: list of objective reaction lists to merge
+    :param merged_model: Merged model to set objective of
+    :param objective_reactions: list of objective reaction lists to merge
     :return: Merged model with its objective set to the merged objective reactions
     """
     merged_reaction = Reaction('merged_objectives')
     st_dict = {}
     metabolite_dict, obj_mets_dict = {}, {}
 
-    for reaction_list in list_of_obj_reac_lists:
+    for reaction_list in objective_reactions:
         for reaction in reaction_list:
             for metabolite in reaction.metabolites:
                 if metabolite.id not in st_dict:
                     st_dict[metabolite.id] = set()
+                    metabolite_dict[metabolite.id] = metabolite
 
-                if metabolite.id not in metabolite_dict:
-                    metabolite_dict[metabolite.id] = metabolite.copy()
-
-                st_dict[metabolite.id] |= {reaction.metabolites[metabolite]}
+                st_dict[metabolite.id].add(reaction.metabolites[metabolite])
 
             merged_reaction.name += reaction.id + "; "
 
@@ -171,31 +169,30 @@ def __create_merged_objective(input_merged_model, list_of_obj_reac_lists):
         merged_reaction.add_metabolites({metabolite_dict[metabolite_id]: avg_stoichiometry})
 
     if len(merged_reaction.metabolites) > 0:
-        input_merged_model.add_reactions({merged_reaction})
-        input_merged_model.objective = merged_reaction.id
+        merged_model.add_reactions({merged_reaction})
+        merged_model.objective = merged_reaction.id
 
-    return input_merged_model
+    return merged_model
 
 
 # sets the objective for merged model
-def __set_objective_expression(merged_model, list_of_models, list_of_obj_reacs, set_objective):
+def __set_objective_expression(merged_model, models, objective_reactions, set_objective):
     """
     Sets the objective expression for merged model.
     :param merged_model: Model whose objective is to be set.
-    :param list_of_models: List of all input models from which objective is chosen.
-    :param list_of_obj_reacs: List of (lists of) all objective reactions in input models.
+    :param models: List of all input models from which objective is chosen.
+    :param objective_reactions: List of (lists of) all objective reactions in input models.
     :param set_objective: 'merge' all input model objective reacs or from one of the input models.
     :return: model with its objective expression set.
     """
     if set_objective == 'merge':
-        merged_model = __create_merged_objective(merged_model, list_of_obj_reacs)
-        return merged_model
-
+        merged_model = __create_merged_objective(merged_model, objective_reactions)
     else:
         model_num = int(set_objective) - 1
-        merged_model.add_reactions(list_of_obj_reacs[model_num])
-        merged_model.objective = list_of_models[model_num].objective.expression
-        return merged_model
+        merged_model.add_reactions(objective_reactions[model_num])
+        merged_model.objective = models[model_num].objective.expression
+
+    return merged_model
 
 
 # loads and returns cobra model based on file format
