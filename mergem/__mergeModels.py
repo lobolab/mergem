@@ -60,34 +60,62 @@ def merge(input_models, set_objective='merge'):
     merged_model_id = 'merged-'
     merged_model_reactions = []
 
-    for model_index in range(0, len(models)):
+    # Add first model
+    model = models[0]
+    merged_model_id += model.id + "-"
+    model_objectives = []
+
+    for metabolite in model.metabolites:
+        old_met_id = metabolite.id
+        new_met_id = __modelHandling.map_to_metabolite_mergem_id(metabolite)
+
+        if (new_met_id is None) or (new_met_id in met_sources_dict):
+            met_sources_dict[old_met_id] = {0}
+        else:
+            met_sources_dict[new_met_id] = {0}
+            met_model_id_dict[new_met_id] = old_met_id
+            metabolite.id = new_met_id
+
+    for reaction in model.reactions:
+        reac_id = reaction.id
+        reac_sources_dict[reac_id] = {0}
+        if reac_id in str(model.objective): # processing objective reactions
+            model_objectives.append(reaction)
+        else:
+            reaction_key, rev_reaction_key = __modelHandling.__create_reaction_key(reaction, False)
+            merged_model_reactions.append(reaction)
+            merged_model_reactions_dict[reaction_key] = reac_id
+            merged_model_reactions_dict[rev_reaction_key] = reac_id
+
+    objective_reactions.append(model_objectives)
+
+    # Merge rest of models
+    for model_index in range(1, len(models)):
         model = models[model_index]
         merged_model_id += model.id + "-"
         model_objectives = []
 
         for metabolite in model.metabolites:
             old_met_id = metabolite.id
-            new_met_id = __modelHandling.map_to_metabolite_mergem_id(metabolite)
 
-            if new_met_id is not None:
-                if new_met_id in met_sources_dict:
-                    met_sources_dict[new_met_id].add(model_index)
-                else:
-                    met_sources_dict[new_met_id] = {model_index}
-                    met_model_id_dict[new_met_id] = old_met_id
-
-                if (new_met_id not in model.metabolites):
-                    metabolite.id = new_met_id
-                else:
-                    for reaction in metabolite.reactions:
-                        st_coeff = reaction.metabolites[metabolite]
-                        reaction.add_metabolites({new_met_id: st_coeff})
-                        reaction.add_metabolites({old_met_id: -st_coeff}) # remove metabolite from reaction
+            if old_met_id in met_sources_dict:
+                met_sources_dict[old_met_id].add(model_index)
             else:
-                if old_met_id in met_sources_dict:
-                    met_sources_dict[old_met_id].add(model_index)
-                else:
+                new_met_id = __modelHandling.map_to_metabolite_mergem_id(metabolite)
+
+                if new_met_id is None:
                     met_sources_dict[old_met_id] = {model_index}
+                else:
+                    if new_met_id in met_sources_dict:
+                        if model_index in met_sources_dict[new_met_id]:
+                            met_sources_dict[old_met_id] = {model_index}
+                        else:
+                            metabolite.id = new_met_id
+                            met_sources_dict[new_met_id].add(model_index)
+                    else:
+                        metabolite.id = new_met_id
+                        met_sources_dict[new_met_id] = {model_index}
+                        met_model_id_dict[new_met_id] = old_met_id
 
         for reaction in model.reactions:
             reac_id = reaction.id
@@ -97,15 +125,18 @@ def merge(input_models, set_objective='merge'):
                     reac_sources_dict[reac_id].add(model_index)
                 else:
                     reac_sources_dict[reac_id] = {model_index}
-
             else:
                 reaction_key, rev_reaction_key = __modelHandling.__create_reaction_key(reaction, False)
                 if (reaction_key in merged_model_reactions_dict):
                     existing_reac_id = merged_model_reactions_dict[reaction_key]
                     reac_sources_dict[existing_reac_id].add(model_index)
+                    if reac_id in reac_sources_dict:
+                        reac_sources_dict[reac_id].add(model_index)
                 elif (rev_reaction_key in merged_model_reactions_dict):
-                    rev_existing_reac = merged_model_reactions_dict[rev_reaction_key]
+                    rev_existing_reac_id = merged_model_reactions_dict[rev_reaction_key]
                     reac_sources_dict[rev_existing_reac_id].add(model_index)
+                    if reac_id in reac_sources_dict:
+                        reac_sources_dict[reac_id].add(model_index)
                 else:
                     merged_model_reactions.append(reaction)
                     merged_model_reactions_dict[reaction_key] = reac_id
