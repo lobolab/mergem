@@ -57,12 +57,14 @@ def merge(input_models, set_objective='merge'):
     objective_reactions = []
     met_model_id_dict, met_sources_dict, reac_sources_dict, merged_model_reactions_dict = {}, {}, {}, {}
 
-    merged_model_id = 'merged'
+    merged_model_id = 'mergem'
+    merged_model_name = 'Mergem'
     merged_model_reactions = []
 
     # Add first model
     model = models[0]
     merged_model_id += '-' + model.id
+    merged_model_name += '; ' + (model.name if model.name else model.id)
     model_objectives = []
 
     for metabolite in model.metabolites:
@@ -78,7 +80,6 @@ def merge(input_models, set_objective='merge'):
 
     for reaction in model.reactions:
         reac_id = reaction.id
-        reac_sources_dict[reac_id] = {0}
         if reac_id in str(model.objective): # processing objective reactions
             model_objectives.append(reaction)
         else:
@@ -86,6 +87,7 @@ def merge(input_models, set_objective='merge'):
             merged_model_reactions.append(reaction)
             merged_model_reactions_dict[reaction_key] = reac_id
             merged_model_reactions_dict[rev_reaction_key] = reac_id
+            reac_sources_dict[reac_id] = {0}
 
     objective_reactions.append(model_objectives)
 
@@ -93,6 +95,7 @@ def merge(input_models, set_objective='merge'):
     for model_index in range(1, len(models)):
         model = models[model_index]
         merged_model_id += '-' + model.id
+        merged_model_name += '; ' + (model.name if model.name else model.id)
         model_objectives = []
 
         for metabolite in model.metabolites:
@@ -121,22 +124,14 @@ def merge(input_models, set_objective='merge'):
             reac_id = reaction.id
             if reac_id in str(model.objective): # processing objective reactions
                 model_objectives.append(reaction)
-                if reac_id in reac_sources_dict:
-                    reac_sources_dict[reac_id].add(model_index)
-                else:
-                    reac_sources_dict[reac_id] = {model_index}
             else:
                 reaction_key, rev_reaction_key = __modelHandling.__create_reaction_key(reaction, False)
                 if (reaction_key in merged_model_reactions_dict):
                     existing_reac_id = merged_model_reactions_dict[reaction_key]
                     reac_sources_dict[existing_reac_id].add(model_index)
-                    if reac_id in reac_sources_dict:
-                        reac_sources_dict[reac_id].add(model_index)
                 elif (rev_reaction_key in merged_model_reactions_dict):
                     rev_existing_reac_id = merged_model_reactions_dict[rev_reaction_key]
                     reac_sources_dict[rev_existing_reac_id].add(model_index)
-                    if reac_id in reac_sources_dict:
-                        reac_sources_dict[reac_id].add(model_index)
                 else:
                     merged_model_reactions.append(reaction)
                     merged_model_reactions_dict[reaction_key] = reac_id
@@ -145,7 +140,7 @@ def merge(input_models, set_objective='merge'):
 
         objective_reactions.append(model_objectives)
 
-    merged_model = cobra.Model(merged_model_id)
+    merged_model = cobra.Model(merged_model_id, merged_model_name)
     merged_model.add_reactions(merged_model_reactions)
 
     jacc_matrix = __compute_jaccard_matrix(len(models), met_sources_dict, reac_sources_dict)

@@ -201,6 +201,8 @@ def __set_objective_expression(merged_model, reac_sources_dict, models, objectiv
         model_num = int(set_objective) - 1
         merged_model.add_reactions(objective_reactions[model_num])
         merged_model.objective = models[model_num].objective.expression
+        for reaction in objective_reactions[model_num]:
+            reac_sources_dict[reaction.id] = {model_num}
 
     return merged_model, reac_sources_dict
 
