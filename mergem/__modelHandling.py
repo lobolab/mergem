@@ -15,7 +15,7 @@ from . import __database_id_merger
 curr_dir = os.path.dirname(__file__)
 __mergem_met_id_dict, __mergem_met_info_dict = {}, {}
 
-localization_dict = {'p': 'p', 'p0': 'p', 'periplasm': 'p', 'periplasm_0': 'p', 'mnxc19': 'p',
+__localization_dict = {'p': 'p', 'p0': 'p', 'periplasm': 'p', 'periplasm_0': 'p', 'mnxc19': 'p',
                      'c': 'c', 'c0': 'c', 'cytosol': 'c', 'cytosol_0': 'c', 'cytoplasm': 'c', 'mnxc3': 'c',
                      'cytoplasm_0': 'c',
                      'e': 'e', 'e0': 'e', 'extracellular': 'e', 'extracellular_0': 'e',
@@ -27,13 +27,15 @@ localization_dict = {'p': 'p', 'p0': 'p', 'periplasm': 'p', 'periplasm_0': 'p', 
                      'v': 'v', 'vacuole': 'v', 'mnxc9': 'v',
                      'n': 'n', 'nucleus': 'n', 'mnxc6': 'n'}
 
+__proton_mergem_id = ''
+
 # To convert model met ID to mergem ID
 def __load_or_create_id_mapper():
     """
     Checks if metabolite id mapper exists in current directory, else downloads the latest database files,
     merges the database identifiers based on common properties and saves the mapping table as a pickle.
     """
-    global __mergem_met_id_dict, __mergem_met_info_dict
+    global __mergem_met_id_dict, __mergem_met_info_dict, __proton_mergem_id
     met_conv_file = "metaboliteIdMapper.p"
     met_info_file = 'metaboliteInfo.p'
     met_conv_pickle_path = os.path.join(curr_dir, "data", met_conv_file)
@@ -54,6 +56,7 @@ def __load_or_create_id_mapper():
         __mergem_met_id_dict = __database_id_merger.__return_mapping_and_info_dicts()[2]
         __mergem_met_info_dict = __database_id_merger.__return_mapping_and_info_dicts()[3]
 
+    __proton_mergem_id = 'mergem_' + str(__mergem_met_id_dict['cpd00067']) + '_'
 
 def __update_id_mapping_pickles():
     """
@@ -70,7 +73,7 @@ def map_localization(id_or_model_localization):
     :param id_or_model_localization: cellular localization of entity in model
     :return: single letter cellular localization
     """
-    localization = localization_dict.get(id_or_model_localization.lower(), '')
+    localization = __localization_dict.get(id_or_model_localization.lower(), '')
 
     return localization
 
@@ -87,14 +90,16 @@ def __create_reaction_key(reaction, reverse=False):
     reac_metabolite_set = set()
     reac_rev_met_set = set()
     for reactant in reaction.reactants:
-        if ('mergem_78_' not in reactant.id) and (reactant.id[-1] != 'b') and (reactant.name != "PMF"):
+        if (not reactant.id.startswith(__proton_mergem_id)) and (reactant.id[-1] != 'b') and (reactant.name != "PMF"):
             metabolite_set = (reactant.id, -1)
             rev_met_set = (reactant.id, 1)
             reac_metabolite_set.add(metabolite_set)
             reac_rev_met_set.add(rev_met_set)
+        else:
+            a = 3
 
     for product in reaction.products:
-        if ('mergem_78_' not in product.id) and (product.id[-1] != 'b') and (product.name != "PMF"):
+        if (not product.id.startswith(__proton_mergem_id)) and (product.id[-1] != 'b') and (product.name != "PMF"):
             metabolite_set = (product.id, 1)
             rev_met_set = (product.id, -1)
             reac_metabolite_set.add(metabolite_set)
