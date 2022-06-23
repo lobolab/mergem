@@ -57,12 +57,12 @@ def merge(input_models, set_objective='merge'):
     objective_reactions = []
     met_model_id_dict, met_sources_dict, reac_sources_dict, merged_model_reactions_dict = {}, {}, {}, {}
 
-    merged_model_id = 'merged-'
+    merged_model_id = 'merged'
     merged_model_reactions = []
 
     # Add first model
     model = models[0]
-    merged_model_id += model.id + "-"
+    merged_model_id += '-' + model.id
     model_objectives = []
 
     for metabolite in model.metabolites:
@@ -92,7 +92,7 @@ def merge(input_models, set_objective='merge'):
     # Merge rest of models
     for model_index in range(1, len(models)):
         model = models[model_index]
-        merged_model_id += model.id + "-"
+        merged_model_id += '-' + model.id
         model_objectives = []
 
         for metabolite in model.metabolites:
@@ -145,7 +145,6 @@ def merge(input_models, set_objective='merge'):
 
         objective_reactions.append(model_objectives)
 
-    merged_model_id = merged_model_id[:-1]
     merged_model = cobra.Model(merged_model_id)
     merged_model.add_reactions(merged_model_reactions)
 
@@ -154,10 +153,7 @@ def merge(input_models, set_objective='merge'):
     num_mets_merged = sum([len(model.metabolites) for model in models]) - len(met_sources_dict)
     num_reacs_merged = sum([len(model.reactions) for model in models]) - len(reac_sources_dict)
 
-    if set_objective == 'merge':
-        reac_sources_dict['merged_objectives'] = list(range(0, len(models)))
-
-    merged_model = __modelHandling.__set_objective_expression(merged_model, models,
+    merged_model, reac_sources_dict = __modelHandling.__set_objective_expression(merged_model, reac_sources_dict, models,
                                                               objective_reactions, set_objective)
 
     # Revert mergem ids and convert sources to lists
