@@ -79,7 +79,7 @@ def map_localization(id_or_model_localization):
 
 
 # reaction key is a frozenset of tuples of participating mets with their stoichiometric coeffs
-def __create_reaction_key(reaction, translate_ids):
+def __create_reaction_key(reaction):
     """
     Takes a reaction object as input and creates a key(frozen set) of all pairs of metabolite ID and stoichiometric
     coefficients. \n
@@ -90,7 +90,7 @@ def __create_reaction_key(reaction, translate_ids):
     reac_rev_met_set = set()
     for reactant in reaction.reactants:
         if (not reactant.id.startswith(__proton_mergem_id)) and (reactant.id[-1] != 'b') and (reactant.name != "PMF"):
-            id = reactant.id if (not translate_ids) or reactant.id.startswith('mergem_') else map_to_metabolite_mergem_id(reactant)
+            id = reactant.id if reactant.id.startswith('mergem_') else map_to_metabolite_mergem_id(reactant)
             metabolite_set = (id, -1)
             rev_met_set = (id, 1)
             reac_metabolite_set.add(metabolite_set)
@@ -98,7 +98,7 @@ def __create_reaction_key(reaction, translate_ids):
 
     for product in reaction.products:
         if (not product.id.startswith(__proton_mergem_id)) and (product.id[-1] != 'b') and (product.name != "PMF"):
-            id = product.id if (not translate_ids) or product.id.startswith('mergem_') else map_to_metabolite_mergem_id(product)
+            id = product.id if product.id.startswith('mergem_') else map_to_metabolite_mergem_id(product)
             metabolite_set = (id, 1)
             rev_met_set = (id, -1)
             reac_metabolite_set.add(metabolite_set)
