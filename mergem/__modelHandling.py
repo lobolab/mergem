@@ -56,7 +56,7 @@ def __load_or_create_id_mapper():
         __mergem_met_id_dict = __database_id_merger.__return_mapping_and_info_dicts()[2]
         __mergem_met_info_dict = __database_id_merger.__return_mapping_and_info_dicts()[3]
 
-    __proton_mergem_id = 'mergem_' + str(__mergem_met_id_dict['cpd00067']) + '_'
+    __proton_mergem_id = 'mergem_' + str(__mergem_met_id_dict['C00080']) + '_'
 
 def __update_id_mapping_pickles():
     """
@@ -79,29 +79,28 @@ def map_localization(id_or_model_localization):
 
 
 # reaction key is a frozenset of tuples of participating mets with their stoichiometric coeffs
-def __create_reaction_key(reaction, reverse=False):
+def __create_reaction_key(reaction, translate_ids):
     """
     Takes a reaction object as input and creates a key(frozen set) of all pairs of metabolite ID and stoichiometric
     coefficients. \n
     :param reaction: Cobra reaction object
-    :param reverse: reverse the reaction before creating key
     :return: frozen set of pairs of IDs of participating metabolite and their stoichiometric coefficients
     """
     reac_metabolite_set = set()
     reac_rev_met_set = set()
     for reactant in reaction.reactants:
         if (not reactant.id.startswith(__proton_mergem_id)) and (reactant.id[-1] != 'b') and (reactant.name != "PMF"):
-            metabolite_set = (reactant.id, -1)
-            rev_met_set = (reactant.id, 1)
+            id = reactant.id if (not translate_ids) or reactant.id.startswith('mergem_') else map_to_metabolite_mergem_id(reactant)
+            metabolite_set = (id, -1)
+            rev_met_set = (id, 1)
             reac_metabolite_set.add(metabolite_set)
             reac_rev_met_set.add(rev_met_set)
-        else:
-            a = 3
 
     for product in reaction.products:
         if (not product.id.startswith(__proton_mergem_id)) and (product.id[-1] != 'b') and (product.name != "PMF"):
-            metabolite_set = (product.id, 1)
-            rev_met_set = (product.id, -1)
+            id = product.id if (not translate_ids) or product.id.startswith('mergem_') else map_to_metabolite_mergem_id(product)
+            metabolite_set = (id, 1)
+            rev_met_set = (id, -1)
             reac_metabolite_set.add(metabolite_set)
             reac_rev_met_set.add(rev_met_set)
 
@@ -127,7 +126,6 @@ def map_to_metabolite_mergem_id(metabolite):
         else:
             split = metabolite.id.rsplit("_", 1)
         met_mergem_id =  __mergem_met_id_dict.get(split[0])
-
 
     if met_mergem_id is not None:
         met_compartment = map_localization(metabolite.compartment)
@@ -171,16 +169,17 @@ def __create_merged_objective(merged_model, reac_sources_dict, objective_reactio
             merged_obj_reaction_id += '-' + reaction.id
             merged_obj_reaction_name += '; ' + reaction.name
 
-    merged_obj_reaction = Reaction(merged_obj_reaction_id, merged_obj_reaction_name)
+    if len(st_dict):
+        merged_obj_reaction = Reaction(merged_obj_reaction_id, merged_obj_reaction_name)
 
-    for metabolite_id, met_stoichiometries in st_dict.items():
-        avg_stoichiometry = sum(met_stoichiometries)/len(met_stoichiometries)
-        merged_obj_reaction.add_metabolites({metabolite_dict[metabolite_id]: avg_stoichiometry})
+        for metabolite_id, met_stoichiometries in st_dict.items():
+            avg_stoichiometry = sum(met_stoichiometries)/len(met_stoichiometries)
+            merged_obj_reaction.add_metabolites({metabolite_dict[metabolite_id]: avg_stoichiometry})
 
-    merged_model.add_reaction(merged_obj_reaction)
-    merged_model.objective = merged_obj_reaction_id
+        merged_model.add_reaction(merged_obj_reaction)
+        merged_model.objective = merged_obj_reaction_id
 
-    reac_sources_dict[merged_obj_reaction_id] = list(range(0, len(objective_reactions)))
+        reac_sources_dict[merged_obj_reaction_id] = list(range(0, len(objective_reactions)))
 
     return merged_model, reac_sources_dict
 
@@ -199,10 +198,12 @@ def __set_objective_expression(merged_model, reac_sources_dict, models, objectiv
         merged_model, reac_sources_dict = __create_merged_objective(merged_model, reac_sources_dict, objective_reactions)
     else:
         model_num = int(set_objective) - 1
-        merged_model.add_reactions(objective_reactions[model_num])
-        merged_model.objective = models[model_num].objective.expression
-        for reaction in objective_reactions[model_num]:
-            reac_sources_dict[reaction.id] = {model_num}
+        reactions = objective_reactions[model_num]
+        if len(reactions):
+            merged_model.add_reactions(reactions)
+            merged_model.objective = models[model_num].objective.expression
+            for reaction in reactions:
+                reac_sources_dict[reaction.id] = {model_num}
 
     return merged_model, reac_sources_dict
 
