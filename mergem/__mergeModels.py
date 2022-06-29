@@ -108,28 +108,24 @@ def merge(input_models, set_objective='merge'):
                     met_sources_dict[old_met_id].add(model_index)
                 else:
                     met_sources_dict[old_met_id] = {model_index}
-            else:
-                if old_met_id in met_sources_dict:
-                    met_sources_dict[old_met_id].add(model_index)
-                if new_met_id in met_sources_dict:
-                    if model_index in met_sources_dict[new_met_id]:
-                        for reaction in metabolite.reactions:
-                            if new_met_id in [met.id for met in reaction.metabolites]: # metabolite conflict
-                                if old_met_id in met_sources_dict:
-                                    met_sources_dict[old_met_id].add(model_index)
-                                else:
-                                    met_sources_dict[old_met_id] = {model_index}
-                            else: # remove metabolite from reaction
-                                st_coeff = reaction.metabolites[metabolite]
-                                reaction.add_metabolites({old_met_id: -st_coeff})
-                                reaction.add_metabolites({new_met_id: st_coeff})
-                    else:
-                        metabolite.id = new_met_id
-                        met_sources_dict[new_met_id].add(model_index)
+            elif old_met_id in met_sources_dict:
+                met_sources_dict[old_met_id].add(model_index)
+            elif new_met_id in met_sources_dict:
+                if model_index in met_sources_dict[new_met_id]:
+                    for reaction in metabolite.reactions:
+                        if new_met_id in [met.id for met in reaction.metabolites]: # metabolite conflict
+                            met_sources_dict[old_met_id] = {model_index}
+                        else: # remove metabolite from reaction
+                            st_coeff = reaction.metabolites[metabolite]
+                            reaction.add_metabolites({old_met_id: -st_coeff})
+                            reaction.add_metabolites({new_met_id: st_coeff})
                 else:
                     metabolite.id = new_met_id
-                    met_sources_dict[new_met_id] = {model_index}
-                    met_model_id_dict[new_met_id] = old_met_id
+                    met_sources_dict[new_met_id].add(model_index)
+            else:
+                metabolite.id = new_met_id
+                met_sources_dict[new_met_id] = {model_index}
+                met_model_id_dict[new_met_id] = old_met_id
 
         for reaction in model.reactions:
             reac_id = reaction.id
