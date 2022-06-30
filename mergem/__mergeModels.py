@@ -88,7 +88,6 @@ def merge(input_models, set_objective='merge'):
             reaction_key, rev_reaction_key = __modelHandling.__create_reaction_key(reaction)
             if not reaction_key in merged_model_reactions_dict:
                 merged_model_reactions_dict[reaction_key] = reac_id
-                merged_model_reactions_dict[rev_reaction_key] = reac_id
 
     objective_reactions.append(model_objectives)
 
