@@ -152,7 +152,6 @@ def merge(input_models, set_objective='merge'):
 
                     merged_model_reactions.append(reaction)
                     merged_model_reactions_dict[reaction_key] = reac_id
-                    merged_model_reactions_dict[rev_reaction_key] = reac_id
                     reac_sources_dict[reac_id] = {model_index}
 
         objective_reactions.append(model_objectives)
