@@ -117,29 +117,28 @@ def map_to_metabolite_mergem_id(metabolite):
     :param metabolite: Cobra metabolite object
     :return: mergem_id notation for the metabolite
     """
-    met_mergem_id = __mergem_met_id_dict.get(metabolite.id)
+    met_univ_id = __mergem_met_id_dict.get(metabolite.id)
 
     split = None
-    if met_mergem_id is None:
+    if met_univ_id is None:
         if '@' in metabolite.id:
             split = metabolite.id.rsplit('@', 1)
         else:
             split = metabolite.id.rsplit("_", 1)
-        met_mergem_id =  __mergem_met_id_dict.get(split[0])
+        met_univ_id =  __mergem_met_id_dict.get(split[0])
 
-    if met_mergem_id is not None:
-        met_compartment = map_localization(metabolite.compartment)
-        if (met_compartment == ''):
-            if (split is None):
-                if '@' in metabolite.id:
-                    split = metabolite.id.rsplit('@', 1)
-                else:
-                    split = metabolite.id.rsplit("_", 1)
-            met_compartment = map_localization(split[1])
-        if (met_compartment == ''):
-            met_compartment = split[1]
+    met_compartment = map_localization(metabolite.compartment)
+    if (met_compartment == ''):
+        if (split is None):
+            if '@' in metabolite.id:
+                split = metabolite.id.rsplit('@', 1)
+            else:
+                split = metabolite.id.rsplit("_", 1)
+        met_compartment = map_localization(split[1])
+    if (met_compartment == ''):
+        met_compartment = split[1]
 
-        met_mergem_id = "mergem_" + str(met_mergem_id) + "_" + met_compartment
+    met_mergem_id = "mergem_" + str(met_univ_id) + "_" + met_compartment
 
     return met_mergem_id
 

@@ -59,6 +59,7 @@ def merge(input_models, set_objective='merge'):
 
     merged_model_id = 'mergem'
     merged_model_name = 'Mergem'
+    merged_model_metabolites = []
     merged_model_reactions = []
 
     # Add first model
@@ -68,14 +69,18 @@ def merge(input_models, set_objective='merge'):
     model_objectives = []
 
     for metabolite in model.metabolites:
+        merged_model_metabolites.append(metabolite)
         old_met_id = metabolite.id
         new_met_id = __modelHandling.map_to_metabolite_mergem_id(metabolite)
 
-        if (new_met_id is None) or (new_met_id in met_sources_dict):
+        if new_met_id in met_sources_dict:
             met_sources_dict[old_met_id] = {0}
         else:
             met_sources_dict[new_met_id] = {0}
-            met_model_id_dict[new_met_id] = old_met_id
+            if new_met_id in met_model_id_dict:
+                met_model_id_dict[new_met_id].append(old_met_id)
+            else:
+                met_model_id_dict[new_met_id] = [old_met_id]
             metabolite.id = new_met_id
 
     for reaction in model.reactions:
@@ -97,24 +102,26 @@ def merge(input_models, set_objective='merge'):
         merged_model_id += '_' + model.id
         merged_model_name += '; ' + (model.name if model.name else model.id)
         model_objectives = []
+        model_metabolite_ids = {m.id for m in model.metabolites}
 
         for metabolite in model.metabolites:
             old_met_id = metabolite.id
             new_met_id = __modelHandling.map_to_metabolite_mergem_id(metabolite)
 
-            if new_met_id is None:
-                if old_met_id in met_sources_dict:
-                    met_sources_dict[old_met_id].add(model_index)
-                else:
-                    met_sources_dict[old_met_id] = {model_index}
-            elif old_met_id in met_sources_dict:
+            if old_met_id in met_sources_dict: # priority is given to original metabolite ids
                 met_sources_dict[old_met_id].add(model_index)
-            elif new_met_id in met_sources_dict:
-                if model_index in met_sources_dict[new_met_id]:
-                    for reaction in metabolite.reactions:
-                        if new_met_id in [met.id for met in reaction.metabolites]: # metabolite conflict
-                            met_sources_dict[old_met_id] = {model_index}
-                        else: # remove metabolite from reaction
+            elif new_met_id in met_sources_dict: # new metabolite id previously found
+                old_met_ids = met_model_id_dict[new_met_id]
+                if (old_met_id not in old_met_ids) and any(id in old_met_ids for id in model_metabolite_ids): # model has a better match
+                    met_sources_dict[old_met_id] = {model_index}
+                    merged_model_metabolites.append(metabolite)
+                elif model_index in met_sources_dict[new_met_id]: # model already had a metabolite for this mergem id
+                    for reaction in metabolite.reactions: # replace id in its reactions
+                        if new_met_id in [met.id for met in reaction.metabolites]: # new metabolite id conflict, keep it
+                            if old_met_id not in met_sources_dict: # first reaction with conflict
+                                met_sources_dict[old_met_id] = {model_index}
+                                merged_model_metabolites.append(metabolite)
+                        else: # substitute metabolite in reaction
                             st_coeff = reaction.metabolites[metabolite]
                             reaction.add_metabolites({old_met_id: -st_coeff})
                             reaction.add_metabolites({new_met_id: st_coeff})
@@ -124,7 +131,11 @@ def merge(input_models, set_objective='merge'):
             else:
                 metabolite.id = new_met_id
                 met_sources_dict[new_met_id] = {model_index}
-                met_model_id_dict[new_met_id] = old_met_id
+                if new_met_id in met_model_id_dict:
+                    met_model_id_dict[new_met_id].append(old_met_id)
+                else:
+                    met_model_id_dict[new_met_id] = [old_met_id]
+                merged_model_metabolites.append(metabolite)
 
         for reaction in model.reactions:
             reac_id = reaction.id
@@ -156,6 +167,7 @@ def merge(input_models, set_objective='merge'):
         objective_reactions.append(model_objectives)
 
     merged_model = cobra.Model(merged_model_id, merged_model_name)
+    merged_model.add_metabolites(merged_model_metabolites)
     merged_model.add_reactions(merged_model_reactions)
 
     jacc_matrix = __compute_jaccard_matrix(len(models), met_sources_dict, reac_sources_dict)
@@ -174,10 +186,10 @@ def merge(input_models, set_objective='merge'):
     merged_model.repair()
 
     # Revert mergem ids and convert sources to lists
-    met_sources_dict = {met_model_id_dict.get(met_id, met_id): list(sources) for (met_id, sources) in met_sources_dict.items()}
+    met_sources_dict = {met_model_id_dict.get(met_id, [met_id])[0]: list(sources) for (met_id, sources) in met_sources_dict.items()}
     reac_sources_dict = {reac_id : list(sources) for (reac_id, sources) in reac_sources_dict.items()}
     for metabolite in merged_model.metabolites:
-        old_met_id = met_model_id_dict.get(metabolite.id, metabolite.id)
+        old_met_id = met_model_id_dict.get(metabolite.id, [metabolite.id])[0]
         if old_met_id != metabolite.id:
             if old_met_id in merged_model.metabolites:
                 alt_old_met_id = old_met_id
