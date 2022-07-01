@@ -11,9 +11,9 @@ import click
 import sys
 import os
 import mergem
-from . import __version
+from .__version import _version
 
-allowed_file_formats = ["sbml", "xml", "mat", "m", "matlab", "json", "yaml"]
+_allowed_file_formats = ["sbml", "xml", "mat", "m", "matlab", "json", "yaml"]
 
 
 @click.command(no_args_is_help=True)
@@ -23,7 +23,7 @@ allowed_file_formats = ["sbml", "xml", "mat", "m", "matlab", "json", "yaml"]
 @click.option('-o', nargs=1, help='Save model as (filename with format .xml, .sbml, etc.)')
 @click.option('-v', help='Print merging statistics', is_flag=True)
 @click.option('-up', help='Update ID mapping table', is_flag=True)
-@click.version_option(__version.version + "\nLobo Lab (https://lobolab.umbc.edu)")
+@click.version_option(_version + "\nLobo Lab (https://lobolab.umbc.edu)")
 def main(input_filenames, obj, o=None, v=False, up=False):
     """
     mergem takes genome-scale metabolic models as input, merges them into a single model
@@ -38,7 +38,7 @@ def main(input_filenames, obj, o=None, v=False, up=False):
     print_stats = v
     input_list_of_models = []
 
-    click.secho(f"mergem, v{__version.version}")
+    click.secho(f"mergem, v{_version}")
 
     if up:
         click.secho('Updating ID mapper. This process may take a few hours.. ')
@@ -57,7 +57,7 @@ def main(input_filenames, obj, o=None, v=False, up=False):
 
     if output_filename is not None:
         file_format = os.path.splitext(output_filename)[1][1:].strip().lower()
-        if file_format not in allowed_file_formats:
+        if file_format not in _allowed_file_formats:
             click.secho('Error: Invalid output file format.', fg='red')
             sys.exit()
 

@@ -7,15 +7,19 @@
 """
 
 import cobra.io
-from cobra import Model, Reaction
-from pickle import load
+from pickle import dump, load
 import os
-from . import __database_id_merger
+from .__database_id_merger import build_id_mapping
+
+met_univ_id_dict, met_univ_id_prop_dict, reac_univ_id_dict, reac_univ_id_prop_dict = {}, {}, {}, {}
 
 curr_dir = os.path.dirname(__file__)
-__mergem_met_id_dict, __mergem_met_info_dict = {}, {}
+met_univ_id_dict_file = os.path.join(curr_dir, 'data', 'metaboliteIdMapper.p')
+met_univ_id_prop_dict_file = os.path.join(curr_dir, 'data', 'metaboliteInfo.p')
+reac_univ_id_dict_file = os.path.join(curr_dir, 'data', 'reactionIdMapper.p')
+reac_univ_id_prop_dict_file = os.path.join(curr_dir, 'data', 'reactionInfo.p')
 
-__localization_dict = {'p': 'p', 'p0': 'p', 'periplasm': 'p', 'periplasm_0': 'p', 'mnxc19': 'p',
+localization_dict = {'p': 'p', 'p0': 'p', 'periplasm': 'p', 'periplasm_0': 'p', 'mnxc19': 'p',
                      'c': 'c', 'c0': 'c', 'cytosol': 'c', 'cytosol_0': 'c', 'cytoplasm': 'c', 'mnxc3': 'c',
                      'cytoplasm_0': 'c',
                      'e': 'e', 'e0': 'e', 'extracellular': 'e', 'extracellular_0': 'e',
@@ -27,184 +31,7 @@ __localization_dict = {'p': 'p', 'p0': 'p', 'periplasm': 'p', 'periplasm_0': 'p'
                      'v': 'v', 'vacuole': 'v', 'mnxc9': 'v',
                      'n': 'n', 'nucleus': 'n', 'mnxc6': 'n'}
 
-__proton_mergem_id = ''
-
-# To convert model met ID to mergem ID
-def __load_or_create_id_mapper():
-    """
-    Checks if metabolite id mapper exists in current directory, else downloads the latest database files,
-    merges the database identifiers based on common properties and saves the mapping table as a pickle.
-    """
-    global __mergem_met_id_dict, __mergem_met_info_dict, __proton_mergem_id
-    met_conv_file = "metaboliteIdMapper.p"
-    met_info_file = 'metaboliteInfo.p'
-    met_conv_pickle_path = os.path.join(curr_dir, "data", met_conv_file)
-    met_info_pickle_path = os.path.join(curr_dir, "data", met_info_file)
-
-    if (os.path.exists(met_conv_pickle_path)) and (os.path.exists(met_info_pickle_path)):
-        f = open(met_conv_pickle_path, "rb")
-        __mergem_met_id_dict = load(f)
-        f.close()
-
-        f = open(met_info_pickle_path, "rb")
-        __mergem_met_info_dict = load(f)
-        f.close()
-
-    else:
-        print("Building ID mapping and metabolite Info table.")
-        __database_id_merger.__create_id_mapping_pickle()
-        __mergem_met_id_dict = __database_id_merger.__return_mapping_and_info_dicts()[2]
-        __mergem_met_info_dict = __database_id_merger.__return_mapping_and_info_dicts()[3]
-
-    __proton_mergem_id = 'mergem_' + str(__mergem_met_id_dict['C00080']) + '_'
-
-def __update_id_mapping_pickles():
-    """
-    Downloads latest versions of database files, merges the metabolite identifiers that have common
-    properties and saves the mapping table as a pickle.
-    """
-    __database_id_merger.__create_id_mapping_pickle()
-
-
-# convert cellular localization to single namespace
-def map_localization(id_or_model_localization):
-    """
-    Converts localization suffixes into common notation.
-    :param id_or_model_localization: cellular localization of entity in model
-    :return: single letter cellular localization
-    """
-    localization = __localization_dict.get(id_or_model_localization.lower(), '')
-
-    return localization
-
-
-# reaction key is a frozenset of tuples of participating mets with their stoichiometric coeffs
-def __create_reaction_key(reaction):
-    """
-    Takes a reaction object as input and creates a key(frozen set) of all pairs of metabolite ID and stoichiometric
-    coefficients. \n
-    :param reaction: Cobra reaction object
-    :return: frozen set of pairs of IDs of participating metabolite and their stoichiometric coefficients
-    """
-    reac_metabolite_set = set()
-    reac_rev_met_set = set()
-    for reactant in reaction.reactants:
-        if (not reactant.id.startswith(__proton_mergem_id)) and (reactant.id[-1] != 'b') and (reactant.name != "PMF"):
-            id = reactant.id if reactant.id.startswith('mergem_') else map_to_metabolite_mergem_id(reactant)
-            metabolite_set = (id, -1)
-            rev_met_set = (id, 1)
-            reac_metabolite_set.add(metabolite_set)
-            reac_rev_met_set.add(rev_met_set)
-
-    for product in reaction.products:
-        if (not product.id.startswith(__proton_mergem_id)) and (product.id[-1] != 'b') and (product.name != "PMF"):
-            id = product.id if product.id.startswith('mergem_') else map_to_metabolite_mergem_id(product)
-            metabolite_set = (id, 1)
-            rev_met_set = (id, -1)
-            reac_metabolite_set.add(metabolite_set)
-            reac_rev_met_set.add(rev_met_set)
-
-    reac_metabolite_set = frozenset(reac_metabolite_set)
-    reac_rev_met_set = frozenset(reac_rev_met_set)
-
-    return reac_metabolite_set, reac_rev_met_set
-
-
-# returns a metabolite id in mergem namespace with cellular localization
-def map_to_metabolite_mergem_id(metabolite):
-    """
-    Takes a metabolite object as input and returns mergem_id notation for metabolite
-    :param metabolite: Cobra metabolite object
-    :return: mergem_id notation for the metabolite or None if there is no mapping
-    """
-    met_univ_id = __mergem_met_id_dict.get(metabolite.id)
-
-    split = None
-    if met_univ_id is None: # Re-check mapping without compartment
-        if '@' in metabolite.id:
-            split = metabolite.id.rsplit('@', 1)
-        else:
-            split = metabolite.id.rsplit("_", 1)
-        met_univ_id = __mergem_met_id_dict.get(split[0])
-        if met_univ_id is None:
-            return None
-
-    met_compartment = map_localization(metabolite.compartment)
-    if met_compartment == '':
-        if split is None:
-            if '@' in metabolite.id:
-                split = metabolite.id.rsplit('@', 1)
-            else:
-                split = metabolite.id.rsplit("_", 1)
-        met_compartment = map_localization(split[1])
-        if met_compartment == '':
-            met_compartment = split[1]
-
-    return "mergem_" + str(met_univ_id) + "_" + met_compartment
-
-
-# create a reaction that contains input model objective reacs merged together
-def __create_merged_objective(merged_model, reac_sources_dict, objective_reactions):
-    """
-    Merges objective reactions in list and sets as objective in input merged model.
-    :param merged_model: Merged model to set objective of
-    :param objective_reactions: list of objective reaction lists to merge
-    :return: Merged model with its objective set to the merged objective reactions
-    """
-    merged_obj_reaction_id = 'merged'
-    merged_obj_reaction_name = 'Merged all objectives'
-    st_dict = {}
-    metabolite_dict = {}
-
-    for reaction_list in objective_reactions:
-        for reaction in reaction_list:
-            for metabolite in reaction.metabolites:
-                if metabolite.id not in st_dict:
-                    st_dict[metabolite.id] = set()
-                    metabolite_dict[metabolite.id] = metabolite
-
-                st_dict[metabolite.id].add(reaction.metabolites[metabolite])
-
-            merged_obj_reaction_id += '-' + reaction.id
-            merged_obj_reaction_name += '; ' + reaction.name
-
-    if len(st_dict):
-        merged_obj_reaction = Reaction(merged_obj_reaction_id, merged_obj_reaction_name)
-
-        for metabolite_id, met_stoichiometries in st_dict.items():
-            avg_stoichiometry = sum(met_stoichiometries)/len(met_stoichiometries)
-            merged_obj_reaction.add_metabolites({metabolite_dict[metabolite_id]: avg_stoichiometry})
-
-        merged_model.add_reaction(merged_obj_reaction)
-        merged_model.objective = merged_obj_reaction_id
-
-        reac_sources_dict[merged_obj_reaction_id] = list(range(0, len(objective_reactions)))
-
-    return merged_model, reac_sources_dict
-
-
-# sets the objective for merged model
-def __set_objective_expression(merged_model, reac_sources_dict, models, objective_reactions, set_objective):
-    """
-    Sets the objective expression for merged model.
-    :param merged_model: Model whose objective is to be set.
-    :param models: List of all input models from which objective is chosen.
-    :param objective_reactions: List of (lists of) all objective reactions in input models.
-    :param set_objective: 'merge' all input model objective reacs or from one of the input models.
-    :return: model with its objective expression set.
-    """
-    if set_objective == 'merge':
-        merged_model, reac_sources_dict = __create_merged_objective(merged_model, reac_sources_dict, objective_reactions)
-    else:
-        model_num = int(set_objective) - 1
-        reactions = objective_reactions[model_num]
-        if len(reactions):
-            merged_model.add_reactions(reactions)
-            merged_model.objective = models[model_num].objective.expression
-            for reaction in reactions:
-                reac_sources_dict[reaction.id] = {model_num}
-
-    return merged_model, reac_sources_dict
+proton_mergem_id = ''
 
 
 # loads and returns cobra model based on file format
@@ -253,5 +80,124 @@ def save_model(cobra_model, file_name):
         raise IOError('Unable to save merged model. Check file format {}'.format(file_name))
 
 
-# Initialize mapper
-__load_or_create_id_mapper()
+def load_dict(dict, file):
+    if not dict:
+        if os.path.exists(file):
+            f = open(file, "rb")
+            dict = load(f)
+            f.close()
+        else:
+            update_id_mapper()
+
+    return dict
+
+
+def load_met_univ_id_dict():
+    global met_univ_id_dict, proton_mergem_id
+    met_univ_id_dict = load_dict(met_univ_id_dict, met_univ_id_dict_file)
+    proton_mergem_id = 'mergem_' + str(met_univ_id_dict['C00080']) + '_'
+
+
+def load_met_univ_id_prop_dict():
+    global met_univ_id_prop_dict
+    met_univ_id_prop_dict = load_dict(met_univ_id_prop_dict, met_univ_id_prop_dict_file)
+
+
+def load_reac_univ_id_dict():
+    global reac_univ_id_dict
+    reac_univ_id_dict = load_dict(reac_univ_id_dict, reac_univ_id_dict_file)
+
+
+def load_reac_univ_id_prop_dict():
+    global reac_univ_id_prop_dict
+    reac_univ_id_prop_dict = load_dict(reac_univ_id_prop_dict, reac_univ_id_prop_dict_file)
+
+
+def update_id_mapper():
+    """
+    Downloads the latest database files,
+    merges the database identifiers based on common properties and saves the mapping table as a pickle.
+    """
+    global met_univ_id_dict, met_univ_id_prop_dict, reac_univ_id_dict, reac_univ_id_prop_dict
+
+    print("Building ID mapping and properties information.")
+    met_univ_id_dict, met_univ_id_prop_dict, reac_univ_id_dict, reac_univ_id_prop_dict = build_id_mapping()
+
+    log("Creating reaction id pickle")
+    with open(pickle_dir + 'reactionIdMapper.p', 'wb') as file:
+        dump(dict_any_reac_id_to_univ_id, file)
+
+    log("Creating reaction info pickle")
+    with open(pickle_dir + 'reactionInfo.p', 'wb') as file:
+        dump(dict_univ_id_to_reac_prop, file)
+
+    log("Creating metabolite id pickle")
+    with open(pickle_dir + 'metaboliteIdMapper.p', 'wb') as file:
+        dump(dict_any_met_id_to_univ_id, file)
+
+    log("Creating metabolite info pickle")
+    with open(pickle_dir + 'metaboliteInfo.p', 'wb') as file:
+        dump(dict_univ_id_to_met_prop, file)
+
+
+# convert cellular localization to single namespace
+def map_localization(id_or_model_localization):
+    """
+    Converts localization suffixes into common notation.
+    :param id_or_model_localization: cellular localization of entity in model
+    :return: single letter cellular localization
+    """
+    localization = localization_dict.get(id_or_model_localization.lower(), '')
+
+    return localization
+
+
+def map_metabolite_univ_id(met_id):
+    """
+    Maps metabolite id to metabolite universal id
+    """
+    if not met_univ_id_dict:
+        load_met_univ_id_dict()
+
+    met_univ_id = met_univ_id_dict.get(met_id)
+
+    if met_univ_id is None:
+        met_univ_id = met_univ_id_dict.get(remove_localization(met_id))
+
+    return met_univ_id
+
+
+def map_reaction_univ_id(reac_id):
+    """
+    Maps reaction id to metabolite universal id
+    """
+    if not reac_univ_id_dict:
+        load_reac_univ_id_dict()
+
+    reac_univ_id = reac_univ_id_dict.get(reac_id)
+
+    if reac_univ_id is None:
+        reac_univ_id = reac_univ_id_dict.get(remove_localization(reac_id))
+
+    return reac_univ_id
+
+
+def get_metabolite_properties(met_univ_id):
+    if not met_univ_id_prop_dict:
+        load_met_univ_id_prop_dict()
+
+    return met_univ_id_prop_dict.get(met_univ_id)
+
+
+def get_reaction_properties(reac_univ_id):
+    if not reac_univ_id_prop_dict:
+        load_reac_univ_id_prop_dict()
+
+    return reac_univ_id_prop_dict.get(reac_univ_id)
+
+
+def remove_localization(id):
+    if '@' in id:
+        return id.rsplit('@', 1)[0]
+    else:
+        return id.rsplit("_", 1)[0]

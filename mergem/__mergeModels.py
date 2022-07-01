@@ -6,28 +6,8 @@
 
     Copyright (c) Lobo Lab (https://lobolab.umbc.edu)
 """
-from . import __modelHandling
-from .__database_id_merger import __return_mapping_and_info_dicts
+from .__modelHandling import met_univ_id_dict, load_met_univ_id_dict, load_model, proton_mergem_id
 import cobra
-
-
-# update metabolite id mapping pickle
-def update_id_mapper():
-    """
-    Calls the update id mapping pickles function, which downloads most recent database identifier and
-    cross-reference files and merges identifiers based on common properties.
-    """
-    __modelHandling.__update_id_mapping_pickles()
-
-
-# loads reaction and metabolite ID mapping and info dictionaries from pickles
-def get_mapping_and_info_dicts():
-    """
-    Returns dictionaries loaded from pickles. New ID mapping and info dictionaries and pickles are created
-    if they do not exist in data folder.
-    """
-    reaction_id_mapper, reaction_info, metabolite_id_mapper, metabolite_info = __return_mapping_and_info_dicts()
-    return reaction_id_mapper, reaction_info, metabolite_id_mapper, metabolite_info
 
 
 # merges models in a list to the template/first model
@@ -40,12 +20,13 @@ def merge(input_models, set_objective='merge'):
     :return: A dictionary of the merged model, met & reac jaccard distances, num of mets and reacs merged,
             and met & reac sources.
     """
+    load_met_univ_id_dict()
     models = []
 
     for input_model in input_models:
         if isinstance(input_model, str):
             try:
-                input_model = __modelHandling.load_model(input_model)
+                input_model = load_model(input_model)
                 models.append(input_model)
 
             except Exception as e:
@@ -71,7 +52,7 @@ def merge(input_models, set_objective='merge'):
     for metabolite in model.metabolites:
         merged_model_metabolites.append(metabolite)
         old_met_id = metabolite.id
-        new_met_id = __modelHandling.map_to_metabolite_mergem_id(metabolite)
+        new_met_id = map_metabolite_to_mergem_id(metabolite)
 
         if (new_met_id is None) or (new_met_id in met_sources_dict):
             met_sources_dict[old_met_id] = {0}
@@ -90,7 +71,7 @@ def merge(input_models, set_objective='merge'):
         else:
             merged_model_reactions.append(reaction)
             reac_sources_dict[reac_id] = {0}
-            reaction_key, rev_reaction_key = __modelHandling.__create_reaction_key(reaction)
+            reaction_key, rev_reaction_key = create_reaction_key(reaction)
             if not reaction_key in merged_model_reactions_dict:
                 merged_model_reactions_dict[reaction_key] = reac_id
 
@@ -106,7 +87,7 @@ def merge(input_models, set_objective='merge'):
 
         for metabolite in model.metabolites:
             old_met_id = metabolite.id
-            new_met_id = __modelHandling.map_to_metabolite_mergem_id(metabolite)
+            new_met_id = map_metabolite_to_mergem_id(metabolite)
 
             if new_met_id is None:
                 if old_met_id in met_sources_dict:
@@ -147,7 +128,7 @@ def merge(input_models, set_objective='merge'):
             if reac_id in str(model.objective): # processing objective reactions
                 model_objectives.append(reaction)
             else:
-                reaction_key, rev_reaction_key = __modelHandling.__create_reaction_key(reaction)
+                reaction_key, rev_reaction_key = create_reaction_key(reaction)
                 if reaction_key in merged_model_reactions_dict:
                     existing_reac_id = merged_model_reactions_dict[reaction_key]
                     reac_sources_dict[existing_reac_id].add(model_index)
@@ -175,7 +156,7 @@ def merge(input_models, set_objective='merge'):
     merged_model.add_metabolites(merged_model_metabolites)
     merged_model.add_reactions(merged_model_reactions)
 
-    jacc_matrix = __compute_jaccard_matrix(len(models), met_sources_dict, reac_sources_dict)
+    jacc_matrix = compute_jaccard_matrix(len(models), met_sources_dict, reac_sources_dict)
 
     num_mets_merged = sum([len(model.metabolites) for model in models]) - len(met_sources_dict)
     num_reacs_merged = sum([len(model.reactions) for model in models]) - len(reac_sources_dict)
@@ -185,7 +166,7 @@ def merge(input_models, set_objective='merge'):
         if set_objective == 'merge':
             num_reacs_merged += 1
 
-    merged_model, reac_sources_dict = __modelHandling.__set_objective_expression(merged_model, reac_sources_dict, models,
+    merged_model, reac_sources_dict = set_objective_expression(merged_model, reac_sources_dict, models,
                                                               objective_reactions, set_objective)
 
     merged_model.repair()
@@ -220,7 +201,136 @@ def merge(input_models, set_objective='merge'):
     return result
 
 
-def __compute_jaccard_matrix(num_models, met_source_dict, reac_source_dict):
+# returns a metabolite id in mergem namespace with cellular localization
+def map_metabolite_to_mergem_id(metabolite):
+    """
+    Takes a metabolite object as input and returns mergem_id notation for metabolite
+    :param metabolite: Cobra metabolite object
+    :return: mergem_id notation for the metabolite or None if there is no mapping
+    """
+    met_univ_id = met_univ_id_dict.get(metabolite.id)
+
+    split = None
+    if met_univ_id is None: # Re-check mapping without compartment
+        if '@' in metabolite.id:
+            split = metabolite.id.rsplit('@', 1)
+        else:
+            split = metabolite.id.rsplit("_", 1)
+        met_univ_id = met_univ_id_dict.get(split[0])
+        if met_univ_id is None:
+            return None
+
+    met_compartment = map_localization(metabolite.compartment)
+    if met_compartment == '':
+        if split is None:
+            if '@' in metabolite.id:
+                split = metabolite.id.rsplit('@', 1)
+            else:
+                split = metabolite.id.rsplit("_", 1)
+        met_compartment = map_localization(split[1])
+        if met_compartment == '':
+            met_compartment = split[1]
+
+    return "mergem_" + str(met_univ_id) + "_" + met_compartment
+
+
+# reaction key is a frozenset of tuples of participating mets with their stoichiometric coeffs
+def create_reaction_key(reaction):
+    """
+    Takes a reaction object as input and creates a key(frozen set) of all pairs of metabolite ID and stoichiometric
+    coefficients. \n
+    :param reaction: Cobra reaction object
+    :return: frozen set of pairs of IDs of participating metabolite and their stoichiometric coefficients
+    """
+    reac_metabolite_set = set()
+    reac_rev_met_set = set()
+    for reactant in reaction.reactants:
+        if (not reactant.id.startswith(proton_mergem_id)) and (reactant.id[-1] != 'b') and (reactant.name != "PMF"):
+            id = reactant.id if reactant.id.startswith('mergem_') else map_metabolite_to_mergem_id(reactant)
+            metabolite_set = (id, -1)
+            rev_met_set = (id, 1)
+            reac_metabolite_set.add(metabolite_set)
+            reac_rev_met_set.add(rev_met_set)
+
+    for product in reaction.products:
+        if (not product.id.startswith(proton_mergem_id)) and (product.id[-1] != 'b') and (product.name != "PMF"):
+            id = product.id if product.id.startswith('mergem_') else map_metabolite_to_mergem_id(product)
+            metabolite_set = (id, 1)
+            rev_met_set = (id, -1)
+            reac_metabolite_set.add(metabolite_set)
+            reac_rev_met_set.add(rev_met_set)
+
+    reac_metabolite_set = frozenset(reac_metabolite_set)
+    reac_rev_met_set = frozenset(reac_rev_met_set)
+
+    return reac_metabolite_set, reac_rev_met_set
+
+
+# sets the objective for merged model
+def set_objective_expression(merged_model, reac_sources_dict, models, objective_reactions, set_objective):
+    """
+    Sets the objective expression for merged model.
+    :param merged_model: Model whose objective is to be set.
+    :param models: List of all input models from which objective is chosen.
+    :param objective_reactions: List of (lists of) all objective reactions in input models.
+    :param set_objective: 'merge' all input model objective reacs or from one of the input models.
+    :return: model with its objective expression set.
+    """
+    if set_objective == 'merge':
+        merged_model, reac_sources_dict = create_merged_objective(merged_model, reac_sources_dict, objective_reactions)
+    else:
+        model_num = int(set_objective) - 1
+        reactions = objective_reactions[model_num]
+        if len(reactions):
+            merged_model.add_reactions(reactions)
+            merged_model.objective = models[model_num].objective.expression
+            for reaction in reactions:
+                reac_sources_dict[reaction.id] = {model_num}
+
+    return merged_model, reac_sources_dict
+
+
+# create a reaction that contains input model objective reacs merged together
+def create_merged_objective(merged_model, reac_sources_dict, objective_reactions):
+    """
+    Merges objective reactions in list and sets as objective in input merged model.
+    :param merged_model: Merged model to set objective of
+    :param objective_reactions: list of objective reaction lists to merge
+    :return: Merged model with its objective set to the merged objective reactions
+    """
+    merged_obj_reaction_id = 'merged'
+    merged_obj_reaction_name = 'Merged all objectives'
+    st_dict = {}
+    metabolite_dict = {}
+
+    for reaction_list in objective_reactions:
+        for reaction in reaction_list:
+            for metabolite in reaction.metabolites:
+                if metabolite.id not in st_dict:
+                    st_dict[metabolite.id] = set()
+                    metabolite_dict[metabolite.id] = metabolite
+
+                st_dict[metabolite.id].add(reaction.metabolites[metabolite])
+
+            merged_obj_reaction_id += '-' + reaction.id
+            merged_obj_reaction_name += '; ' + reaction.name
+
+    if len(st_dict):
+        merged_obj_reaction = cobra.Reaction(merged_obj_reaction_id, merged_obj_reaction_name)
+
+        for metabolite_id, met_stoichiometries in st_dict.items():
+            avg_stoichiometry = sum(met_stoichiometries)/len(met_stoichiometries)
+            merged_obj_reaction.add_metabolites({metabolite_dict[metabolite_id]: avg_stoichiometry})
+
+        merged_model.add_reaction(merged_obj_reaction)
+        merged_model.objective = merged_obj_reaction_id
+
+        reac_sources_dict[merged_obj_reaction_id] = list(range(0, len(objective_reactions)))
+
+    return merged_model, reac_sources_dict
+
+
+def compute_jaccard_matrix(num_models, met_source_dict, reac_source_dict):
     """
     Creates Jaccard distances matrix using dictionaries with source of each metabolite
     and reaction in merged model.

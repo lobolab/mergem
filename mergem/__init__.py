@@ -1,8 +1,9 @@
-from . import __version
-from .__mergeModels import merge, get_mapping_and_info_dicts, update_id_mapper
-from .__modelHandling import load_model, save_model, map_to_metabolite_mergem_id, map_localization
+from .__version import _version
+from .__mergeModels import merge
+from .__modelHandling import load_model, save_model, map_localization, map_metabolite_univ_id, map_reaction_univ_id, \
+    get_metabolite_properties, get_reaction_properties, update_id_mapper
 
-__all__ = ["load_model", "save_model", "merge", "get_mapping_and_info_dicts", "map_to_metabolite_mergem_id",
-           "map_localization", "update_id_mapper"]
-__version__ = __version.version
+all__ = ["merge", "load_model", "save_model", "map_localization", "map_metabolite_univ_id", "map_reaction_univ_id", \
+         "get_metabolite_properties", "get_reaction_properties", "update_id_mapper"]
+version__ = _version
 

@@ -1,7 +1,7 @@
 """
     Downloads metabolite information files from Kegg, Chebi, ModelSeed, MetaNetX and Bigg
     databases. Creates a dictionary mapping external database metabolite IDs
-    to a mergem ID and another dictionary mapping mergem ID to metabolite properties.
+    to a univ ID and another dictionary mapping univ ID to metabolite properties.
     Copyright (c) Lobo Lab (https://lobolab.umbc.edu)
 """
 
@@ -84,18 +84,17 @@ url_dictionary_chebi = {chebi_compounds_filename: chebi_compounds_zipped_filenam
                         }
 
 # Dictionaries
-dict_any_met_id_to_mergem_id = {}
-dict_mergem_id_to_met_prop = {}
+met_univ_id_dict = {}
+met_univ_id_prop_dict = {}
+reac_univ_id_dict = {}
+reac_univ_id_prop_dict = {}
 list_primary_ids = set()
-met_last_mergem_id, reac_last_mergem_id = 0, 0
+met_last_univ_id, reac_last_univ_id = 0, 0
 start_time = datetime.now().strftime("%Y%m%d_%HH%MM")
 primary_dbs = ['seed', 'metanetx', 'bigg', 'kegg', 'chebi']
 
-dict_any_reac_id_to_mergem_id = {}
-dict_mergem_id_to_reac_prop = {}
 
-
-def __log(message):
+def log(message):
     dt_string = datetime.now().strftime("%Y%m%d_%H:%M:%S")
     log_line = dt_string + " " + message
     print(log_line)
@@ -105,7 +104,7 @@ def __log(message):
     log_file.close()
 
 
-def __create_directories():
+def create_directories():
     if not os.path.exists(files_dir):
         os.makedirs(files_dir)
 
@@ -116,35 +115,35 @@ def __create_directories():
         os.makedirs(log_dir)
 
 
-def __download_database_files():
+def download_database_files():
     global kegg_metabolites_filename
     if (not os.environ.get('PYTHONHTTPSVERIFY', '') and
             getattr(ssl, '_create_unverified_context', None)):
         ssl._create_default_https_context = ssl._create_unverified_context
 
     for filename in url_dictionary.keys():
-        __log("Downloading " + filename)
+        log("Downloading " + filename)
         url = url_dictionary[filename]
         with closing(urllib.request.urlopen(url)) as r:
             with open(filename, 'wb') as f:
                 shutil.copyfileobj(r, f)
 
-        __log(filename + " downloaded.")
+        log(filename + " downloaded.")
 
     for filename, zipped_filename in url_dictionary_chebi.items():
         with gzip_open(zipped_filename, 'rb') as file_in:
             with open(filename, 'wb') as file_out:
                 shutil.copyfileobj(file_in, file_out)
 
-    kegg_metabolites_filename += __check_for_kegg_update()
+    kegg_metabolites_filename += check_for_kegg_update()
 
 
-def __check_for_kegg_update():
+def check_for_kegg_update():
     """
     Checks for a KEGG update and creates a filename for latest version.\n
     :return: filename for latest version
     """
-    __log("Checking Kegg stats. ")
+    log("Checking Kegg stats. ")
     kegg_cpd_stats_response = requests.get("http://rest.kegg.jp/info/cpd")
     release_version = kegg_cpd_stats_response.text.split('\n')[1].split('Release ', 1)[1]
     filename = "kegg_" + \
@@ -153,14 +152,14 @@ def __check_for_kegg_update():
     filename = filename.split("--", 1)[0] + ".p"
 
     if not os.path.isfile(files_dir + filename):
-        __log("New Kegg version found: {}".format(release_version))
-        __log("Downloading new Kegg version.")
-        __download_kegg_compounds(filename)
+        log("New Kegg version found: {}".format(release_version))
+        log("Downloading new Kegg version.")
+        download_kegg_compounds(filename)
 
     return filename
 
 
-def __download_kegg_compounds(filename):
+def download_kegg_compounds(filename):
     """
     Uses API to get information on each compound from KEGG database.\n
     :param filename: filename to save kegg compound information as
@@ -190,144 +189,144 @@ def __download_kegg_compounds(filename):
                     kegg_compounds_dict[kegg_id]['mass'].append(line.split('EXACT_MASS', 1)[1])
                 elif 'chebi:' in line.lower():
                     kegg_compounds_dict[kegg_id]['chebi'].append(line.lower())
-    __log(f"Kegg ids processed: {len(kegg_compounds_dict)}")
+    log(f"Kegg ids processed: {len(kegg_compounds_dict)}")
 
     with open(files_dir + filename, 'wb') as kegg_file:
         dump(kegg_compounds_dict, kegg_file)
 
 
-def __process_reac_file(file_name, file_line_reader):
-    __log("Processing file " + file_name)
+def process_reac_file(file_name, file_line_reader):
+    log("Processing file " + file_name)
     with open(file_name, "r") as file:
         next(file)  # skip header
         for line in file:
             reac_properties = file_line_reader(line.strip().split('\t'))
             if reac_properties is not None:
-                __append_reac_properties(reac_properties)
+                append_reac_properties(reac_properties)
 
-    __log("Done processing file " + file_name)
-    __log(f"Number of reaction ids: {len(dict_any_reac_id_to_mergem_id)}")
-    __log(f"Number of mergem ids: {len(dict_mergem_id_to_reac_prop)}")
-    __log("")
+    log("Done processing file " + file_name)
+    log(f"Number of reaction ids: {len(reac_univ_id_dict)}")
+    log(f"Number of univ ids: {len(reac_univ_id_prop_dict)}")
+    log("")
 
 
-def __process_met_file(file_name, file_line_reader):
+def process_met_file(file_name, file_line_reader):
     """
     Uses reader function to read lines of file and append informaiton to met properties dictionary.\n
     :param file_name: name of database file
     :param file_line_reader: reader function for database file
     """
-    __log("Processing file " + file_name)
+    log("Processing file " + file_name)
     if ".csv" in file_name:
         with open(file_name, "r") as db_file:
             next(db_file)  # skip header
             for line in db_file:
                 met_properties = file_line_reader(line.strip().split(','))
                 if met_properties is not None:
-                    __append_met_properties(met_properties)
+                    append_met_properties(met_properties)
     else:
         with open(file_name, "r") as db_file:
             next(db_file)  # skip header
             for line in db_file:
                 met_properties = file_line_reader(line.strip().split('\t'))
                 if met_properties is not None:
-                    __append_met_properties(met_properties)
+                    append_met_properties(met_properties)
 
-    __log("Done processing file " + file_name)
-    __log(f"Number of metabolite ids: {len(dict_any_met_id_to_mergem_id)}")
-    __log(f"Number of mergem ids: {len(dict_mergem_id_to_met_prop)}")
-    __log(f"List of primary ids: {len(list_primary_ids)}")
-    __log("")
+    log("Done processing file " + file_name)
+    log(f"Number of metabolite ids: {len(met_univ_id_dict)}")
+    log(f"Number of univ ids: {len(met_univ_id_prop_dict)}")
+    log(f"List of primary ids: {len(list_primary_ids)}")
+    log("")
 
 
-def __process_cross_ref_info(file_name, xref_line_reader):
+def process_cross_ref_info(file_name, xref_line_reader):
     """
     Read cross-reference information from file and maps database identifiers
     :param file_name: name of database file containing cross-reference information
     :param xref_line_reader: reader function for database file
     """
-    __log("Processing file " + file_name)
+    log("Processing file " + file_name)
 
-    global dict_any_met_id_to_mergem_id, dict_mergem_id_to_met_prop
+    global met_univ_id_dict, met_univ_id_prop_dict
     xref_dict = xref_line_reader(file_name)
 
     for source_id, xref_list in xref_dict.items():
         for other_id in xref_list:
-            source_mergem_id = dict_any_met_id_to_mergem_id[source_id]
-            if other_id not in dict_any_met_id_to_mergem_id:
-                dict_any_met_id_to_mergem_id[other_id] = source_mergem_id
-                dict_mergem_id_to_met_prop[source_mergem_id]['ids'] += [other_id]
+            source_univ_id = met_univ_id_dict[source_id]
+            if other_id not in met_univ_id_dict:
+                met_univ_id_dict[other_id] = source_univ_id
+                met_univ_id_prop_dict[source_univ_id]['ids'] += [other_id]
             else:
-                other_prop = dict_mergem_id_to_met_prop[dict_any_met_id_to_mergem_id[other_id]]
+                other_prop = met_univ_id_prop_dict[met_univ_id_dict[other_id]]
                 source_db = source_id.rsplit(':', 1)[0]
                 existing_db_mappings = [db_id.rsplit(':', 1)[0] for db_id in other_prop['ids']]
                 if source_db not in existing_db_mappings:
-                    __merge_identifiers(source_id, other_id)
+                    merge_identifiers(source_id, other_id)
 
-    __log("Done processing file " + file_name)
-    __log(f"Number of metabolite ids: {len(dict_any_met_id_to_mergem_id)}")
-    __log(f"Number of mergem ids: {len(dict_mergem_id_to_met_prop)}")
-    __log("")
+    log("Done processing file " + file_name)
+    log(f"Number of metabolite ids: {len(met_univ_id_dict)}")
+    log(f"Number of univ ids: {len(met_univ_id_prop_dict)}")
+    log("")
 
 
-def __append_met_properties(met_properties):
-    global list_primary_ids, dict_any_met_id_to_mergem_id, dict_mergem_id_to_met_prop
-    mergem_id = dict_any_met_id_to_mergem_id.get(met_properties['ids'][0], maxsize)
+def append_met_properties(met_properties):
+    global list_primary_ids, met_univ_id_dict, met_univ_id_prop_dict
+    univ_id = met_univ_id_dict.get(met_properties['ids'][0], maxsize)
 
-    if mergem_id == maxsize:
-        global met_last_mergem_id
-        met_last_mergem_id = met_last_mergem_id + 1
-        mergem_id = met_last_mergem_id
+    if univ_id == maxsize:
+        global met_last_univ_id
+        met_last_univ_id = met_last_univ_id + 1
+        univ_id = met_last_univ_id
 
-        dict_mergem_id_to_met_prop[mergem_id] = {'Name': [], 'ids': [], 'formula': [],
+        met_univ_id_prop_dict[univ_id] = {'Name': [], 'ids': [], 'formula': [],
                                                  'mass': [], 'inchikey': [], 'xref_links': []}
 
-    dict_any_met_id_to_mergem_id[met_properties['ids'][0]] = mergem_id
-    mergem_met_properties = dict_mergem_id_to_met_prop[mergem_id]
+    met_univ_id_dict[met_properties['ids'][0]] = univ_id
+    univ_met_properties = met_univ_id_prop_dict[univ_id]
     list_primary_ids |= {db_id for db_id in met_properties['ids']}
-    mergem_met_properties['ids'] += [met_properties['ids'][0]]
+    univ_met_properties['ids'] += [met_properties['ids'][0]]
 
     for key, value in met_properties.items():
         if (key == 'ids') and (len(value) > 1):
             for met_id in value:
-                if met_id not in dict_any_met_id_to_mergem_id:
-                    dict_any_met_id_to_mergem_id[met_id] = mergem_id
-                    mergem_met_properties[key] += [met_id]
+                if met_id not in met_univ_id_dict:
+                    met_univ_id_dict[met_id] = univ_id
+                    univ_met_properties[key] += [met_id]
         else:
-            __add_values_to_property_list(mergem_met_properties[key], value)
+            add_values_to_property_list(univ_met_properties[key], value)
 
 
-def __append_reac_properties(reac_properties):
-    global dict_any_reac_id_to_mergem_id, dict_mergem_id_to_reac_prop
-    mergem_id = min(fl_id for fl_id in (dict_any_reac_id_to_mergem_id.get(reac_id, maxsize)
-                                        for reac_id in reac_properties['ids']))
+def append_reac_properties(reac_properties):
+    global reac_univ_id_dict, reac_univ_id_prop_dict
+    univ_id = min(fl_id for fl_id in (reac_univ_id_dict.get(reac_id, maxsize)
+                                      for reac_id in reac_properties['ids']))
 
-    if mergem_id == maxsize:
-        global reac_last_mergem_id
-        reac_last_mergem_id = reac_last_mergem_id + 1
-        mergem_id = reac_last_mergem_id
-        dict_mergem_id_to_reac_prop[mergem_id] = {'ids': [], 'Name': [],
+    if univ_id == maxsize:
+        global reac_last_univ_id
+        reac_last_univ_id = reac_last_univ_id + 1
+        univ_id = reac_last_univ_id
+        reac_univ_id_prop_dict[univ_id] = {'ids': [], 'Name': [],
                                                   'EC_num': [], 'Pathways': [], 'xref_links': []}
     unadded_db_ids = []
     for key, value in reac_properties.items():
         if key == 'ids':
             for other_id in value:
-                other_mergem_id = dict_any_reac_id_to_mergem_id.get(other_id)
-                if other_mergem_id is None:
-                    dict_any_reac_id_to_mergem_id[other_id] = mergem_id
-                    dict_mergem_id_to_reac_prop[mergem_id]['ids'] += [other_id]
+                other_univ_id = reac_univ_id_dict.get(other_id)
+                if other_univ_id is None:
+                    reac_univ_id_dict[other_id] = univ_id
+                    reac_univ_id_prop_dict[univ_id]['ids'] += [other_id]
                 else:
                     unadded_db_ids.append(other_id)
         else:
-            __add_values_to_property_list(dict_mergem_id_to_reac_prop[mergem_id][key], value)
+            add_values_to_property_list(reac_univ_id_prop_dict[univ_id][key], value)
 
     for db_id in unadded_db_ids:
-        other_mergem_id = dict_any_reac_id_to_mergem_id.get(db_id)
-        __merge_identifiers(mergem_id, other_mergem_id, True)
+        other_univ_id = reac_univ_id_dict.get(db_id)
+        merge_identifiers(univ_id, other_univ_id, True)
 
 
-def __process_kegg_compounds(filename):
-    __log(f"Processing file {filename}")
+def process_kegg_compounds(filename):
+    log(f"Processing file {filename}")
     kegg_file = open(filename, "rb")
     kegg_compounds_dictionary = load(kegg_file)
     kegg_file.close()
@@ -343,15 +342,15 @@ def __process_kegg_compounds(filename):
                          'formula': properties['formula'],
                          'mass': properties['mass'],
                          }
-        __append_met_properties(property_dict)
+        append_met_properties(property_dict)
 
-    __log(f"Done processing file {filename}")
-    __log(f"Number of metabolite ids: {len(dict_any_met_id_to_mergem_id)}")
-    __log(f"Number of mergem ids: {len(dict_mergem_id_to_met_prop)}")
-    __log("")
+    log(f"Done processing file {filename}")
+    log(f"Number of metabolite ids: {len(met_univ_id_dict)}")
+    log(f"Number of univ ids: {len(met_univ_id_prop_dict)}")
+    log("")
 
 
-def __chebi_compounds_inchi_reader(line):
+def chebi_compounds_inchi_reader(line):
     """
     Reader function for chebi compounds. \n
     :param line: line from file
@@ -363,7 +362,7 @@ def __chebi_compounds_inchi_reader(line):
                 }
 
 
-def __chebi_compounds_names(line):
+def chebi_compounds_names(line):
     """
     Reader function for chebi compounds. \n
     :param line: line from file
@@ -375,7 +374,7 @@ def __chebi_compounds_names(line):
                 }
 
 
-def __metanetx_chem_prop_line_reader(line):
+def metanetx_chem_prop_line_reader(line):
     """
     Reader function for metanetx compounds. \n
     :param line: line from file
@@ -410,7 +409,7 @@ def __metanetx_chem_prop_line_reader(line):
                 'inchikey': []}
 
 
-def __metanetx_chem_prop_xref_reader(file_name):
+def metanetx_chem_prop_xref_reader(file_name):
     """
     Reader function for cross references from metanetx compounds file. \n
     :param file_name: line from file
@@ -448,7 +447,7 @@ def __metanetx_chem_prop_xref_reader(file_name):
     return xref_dict
 
 
-def __metanetx_chem_depr_reader(file_name):
+def metanetx_chem_depr_reader(file_name):
     """
     Reader function for deprecated metabolite IDs in MetaNetX. \n
     :param file_name: name of deprecated IDs file
@@ -478,7 +477,7 @@ def __metanetx_chem_depr_reader(file_name):
     return xref_dict
 
 
-def __metanetx_chem_xref_line_reader(line):
+def metanetx_chem_xref_line_reader(line):
     """
         Reader function for metanetx compounds. \n
         :param line: line from file
@@ -495,7 +494,7 @@ def __metanetx_chem_xref_line_reader(line):
                 }
 
 
-def __metanetx_chem_xref_reader(file_name):
+def metanetx_chem_xref_reader(file_name):
     """
         Reader function for metanetx cross reference file. \n
         :param file_name: name of database file
@@ -534,7 +533,7 @@ def __metanetx_chem_xref_reader(file_name):
     return xref_dict
 
 
-def __modelseed_metabolites_line_reader(line):
+def modelseed_metabolites_line_reader(line):
     """
     Line reader function for modelseed metabolites. \n
     :param line: line from file
@@ -556,7 +555,7 @@ def __modelseed_metabolites_line_reader(line):
             }
 
 
-def __modelseed_metabolites_xref_reader(file_name):
+def modelseed_metabolites_xref_reader(file_name):
     """
     Reader function for cross reference information from modelseed metabolites file. \n
     :param file_name: modelseed metabolites file name
@@ -580,7 +579,7 @@ def __modelseed_metabolites_xref_reader(file_name):
     return xref_dict
 
 
-def __modelseed_met_aliases_reader(file_name):
+def modelseed_met_aliases_reader(file_name):
     """
     Reader function for modelseed metabolite aliases file.\n
     :param file_name: name of metabolite aliases file from modelseed
@@ -614,7 +613,7 @@ def __modelseed_met_aliases_reader(file_name):
     return xref_dict
 
 
-def __bigg_metabolites_line_reader(line):
+def bigg_metabolites_line_reader(line):
     """
     Line reader for metabolites from BiGG database.\n
     :param line: line in file
@@ -662,7 +661,7 @@ def __bigg_metabolites_line_reader(line):
         return None
 
 
-def __bigg_models_xref_reader(file_name):
+def bigg_models_xref_reader(file_name):
     """
     Reader function for cross reference information from BiGG metabolites file.
     :param file_name: name of file
@@ -701,7 +700,7 @@ def __bigg_models_xref_reader(file_name):
     return xref_dict
 
 
-def __modelSeed_reactions_line_reader(line):
+def modelSeed_reactions_line_reader(line):
     """
     Reader function for collecting reaction info from modelseed file. \n
     :param line: line from file
@@ -717,7 +716,7 @@ def __modelSeed_reactions_line_reader(line):
             'EC_num': [line[13]]}
 
 
-def __modelSeed_reaction_aliases_line_reader(line):
+def modelSeed_reaction_aliases_line_reader(line):
     """
     Reader function for collecting identifiers from modelseed aliases file. \n
     :param line: line from file
@@ -737,7 +736,7 @@ def __modelSeed_reaction_aliases_line_reader(line):
         return {'ids': ["seed:" + line[0], other_db + ":" + line[1]]}
 
 
-def __modelSeed_reaction_pathways_line_reader(line):
+def modelSeed_reaction_pathways_line_reader(line):
     """
     Reader function for collecting pathway information. \n
     :param line: line from modelseed pathways file
@@ -747,7 +746,7 @@ def __modelSeed_reaction_pathways_line_reader(line):
             'Pathways': [line[1]]}
 
 
-def __metanetx_reaction_prop_line_reader(line):
+def metanetx_reaction_prop_line_reader(line):
     """
     Reader function for cross references from metanetx reaction file. \n
     :param file_name: line from file
@@ -776,7 +775,7 @@ def __metanetx_reaction_prop_line_reader(line):
         return {'ids': ids}
 
 
-def __metanetx_reaction_xref_line_reader(line):
+def metanetx_reaction_xref_line_reader(line):
     """
     Reader function for metanetx reaction cross reference file. \n
     :param file_name: name of database file
@@ -801,7 +800,7 @@ def __metanetx_reaction_xref_line_reader(line):
     return {'ids': ids}
 
 
-def __bigg_reactions_line_reader(line):
+def bigg_reactions_line_reader(line):
     """
     Line reader for reactions from BiGG database.\n
     :param line: line in file
@@ -850,7 +849,7 @@ def __bigg_reactions_line_reader(line):
         return None
 
 
-def __add_values_to_property_list(property_list, prop_value, for_name=False):
+def add_values_to_property_list(property_list, prop_value, for_name=False):
     invalid_values_list = ['\'\'', '\"\"', 'null', '-', '']
     for value in prop_value:
         if not for_name:
@@ -862,55 +861,55 @@ def __add_values_to_property_list(property_list, prop_value, for_name=False):
                 property_list.append(value)
 
 
-def __merge_identifiers(source_id, other_id, for_reac=False):
+def merge_identifiers(source_id, other_id, for_reac=False):
     """
-    Merges the two met IDs into lowest mergem ID only if at least two properties match.
+    Merges the two met IDs into lowest univ ID only if at least two properties match.
     :param source_id: primary metabolite ID from database being processed
     :param other_id: cross referenced metabolite ID to be mapped to primary met ID
     """
-    global dict_mergem_id_to_met_prop, dict_any_met_id_to_mergem_id, \
-        dict_mergem_id_to_reac_prop, dict_any_reac_id_to_mergem_id
+    global met_univ_id_prop_dict, met_univ_id_dict, \
+        reac_univ_id_prop_dict, reac_univ_id_dict
 
     if for_reac:
-        source_mergem_id = source_id
-        other_mergem_id = other_id
-        id_mapper = dict_any_reac_id_to_mergem_id
-        prop_mapper = dict_mergem_id_to_reac_prop
+        source_univ_id = source_id
+        other_univ_id = other_id
+        id_mapper = reac_univ_id_dict
+        prop_mapper = reac_univ_id_prop_dict
 
     else:
-        source_mergem_id = dict_any_met_id_to_mergem_id.get(source_id)
-        other_mergem_id = dict_any_met_id_to_mergem_id.get(other_id)
-        id_mapper = dict_any_met_id_to_mergem_id
-        prop_mapper = dict_mergem_id_to_met_prop
+        source_univ_id = met_univ_id_dict.get(source_id)
+        other_univ_id = met_univ_id_dict.get(other_id)
+        id_mapper = met_univ_id_dict
+        prop_mapper = met_univ_id_prop_dict
 
-    source_id_properties = prop_mapper[source_mergem_id]
-    other_properties = prop_mapper[other_mergem_id]
+    source_id_properties = prop_mapper[source_univ_id]
+    other_properties = prop_mapper[other_univ_id]
 
-    if other_mergem_id != source_mergem_id:
-        if source_mergem_id < other_mergem_id:
+    if other_univ_id != source_univ_id:
+        if source_univ_id < other_univ_id:
             for xref_id in other_properties['ids']:
-                id_mapper[xref_id] = source_mergem_id
+                id_mapper[xref_id] = source_univ_id
             for key, value in other_properties.items():
                 if key == 'Name':
-                    __add_values_to_property_list(source_id_properties[key], value, True)
+                    add_values_to_property_list(source_id_properties[key], value, True)
                 else:
-                    __add_values_to_property_list(source_id_properties[key], value)
+                    add_values_to_property_list(source_id_properties[key], value)
 
-            del prop_mapper[other_mergem_id]
+            del prop_mapper[other_univ_id]
 
         else:
             for xref_id in source_id_properties['ids']:
-                id_mapper[xref_id] = other_mergem_id
+                id_mapper[xref_id] = other_univ_id
             for key, value in source_id_properties.items():
                 if key == 'Name':
-                    __add_values_to_property_list(other_properties[key], value, True)
+                    add_values_to_property_list(other_properties[key], value, True)
                 else:
-                    __add_values_to_property_list(other_properties[key], value)
+                    add_values_to_property_list(other_properties[key], value)
 
-            del prop_mapper[source_mergem_id]
+            del prop_mapper[source_univ_id]
 
 
-def __clean_id_mapping_dictionary(id_dictionary, info_dictionary, for_reac=False):
+def clean_id_mapping_dictionary(id_dictionary, info_dictionary, for_reac=False):
     dict_copy_id_converter = {}
     dict_copy_info = {}
     db_name_dict = {}
@@ -924,28 +923,28 @@ def __clean_id_mapping_dictionary(id_dictionary, info_dictionary, for_reac=False
         conflict_fl_id = dict_copy_id_converter.get(new_key)
         if conflict_fl_id:
             if db_preference.get(db_name, maxsize) > db_preference.get(db_name_dict[new_key], maxsize):
-                __remove_conflicting_id(new_key, fl_id, info_dictionary)
+                remove_conflicting_id(new_key, fl_id, info_dictionary)
                 fl_id = conflict_fl_id
             else:
-                __remove_conflicting_id(new_key, conflict_fl_id, info_dictionary)
+                remove_conflicting_id(new_key, conflict_fl_id, info_dictionary)
 
         dict_copy_id_converter[new_key] = fl_id
         if new_key not in db_name_dict:
             db_name_dict[new_key] = db_name
 
-    for mergem_id in dict_copy_id_converter.values():
-        copied_info = info_dictionary[mergem_id].copy()
+    for univ_id in dict_copy_id_converter.values():
+        copied_info = info_dictionary[univ_id].copy()
         copied_info['ids'] = list(set(copied_info['ids']))
-        dict_copy_info[mergem_id] = copied_info
+        dict_copy_info[univ_id] = copied_info
 
-    __log(f"Number of database ids: {len(dict_copy_id_converter)}")
-    __log(f"Number of mergem ids: {len(dict_copy_info)}")
-    __log("")
+    log(f"Number of database ids: {len(dict_copy_id_converter)}")
+    log(f"Number of univ ids: {len(dict_copy_info)}")
+    log("")
 
     return dict_copy_id_converter, dict_copy_info
 
 
-def __remove_conflicting_id(db_id, fl_id_to_update, info_dict):
+def remove_conflicting_id(db_id, fl_id_to_update, info_dict):
     other_db_id = []
     if len(info_dict[fl_id_to_update]['ids']) > 1:
         for other_id in info_dict[fl_id_to_update]['ids']:
@@ -959,110 +958,71 @@ def __remove_conflicting_id(db_id, fl_id_to_update, info_dict):
 
 
 # Main program
-def __create_id_mapping_pickle():
+def build_id_mapping():
     """
     Main function that downloads database files and processes them to merge identifiers into a mapping dictionary.
     Mapping dictionary is serialized and saved.
     """
-    global dict_any_met_id_to_mergem_id, dict_mergem_id_to_met_prop, \
-        dict_any_reac_id_to_mergem_id, dict_mergem_id_to_reac_prop
+    global met_univ_id_dict, met_univ_id_prop_dict, \
+        reac_univ_id_dict, reac_univ_id_prop_dict
 
     print("Creating directories")
-    __create_directories()
+    create_directories()
 
-    __log("Downloading files")
+    log("Downloading files")
     tic = perf_counter()
 
-    __download_database_files()
+    download_database_files()
 
     toc = perf_counter()
-    __log("")
-    __log(f"All metabolite files downloaded in {(toc - tic) / 60:0.3f} min")
+    log("")
+    log(f"All metabolite files downloaded in {(toc - tic) / 60:0.3f} min")
 
-    __log("Processing metabolites")
+    log("Processing metabolites")
     tic = perf_counter()
 
     # Process KeGG database metabolites
-    __process_kegg_compounds(kegg_metabolites_filename)
+    process_kegg_compounds(kegg_metabolites_filename)
 
     # Process ChEBI database metabolite IDs
-    __process_met_file(chebi_compound_structure_filename, __chebi_compounds_inchi_reader)
-    __process_met_file(chebi_compounds_filename, __chebi_compounds_names)
+    process_met_file(chebi_compound_structure_filename, chebi_compounds_inchi_reader)
+    process_met_file(chebi_compounds_filename, chebi_compounds_names)
 
     # Process MetaNetX database metabolite IDs
-    __process_met_file(mx_chem_prop_filename, __metanetx_chem_prop_line_reader)
-    __process_cross_ref_info(mx_met_depr_filename, __metanetx_chem_depr_reader)
-    __process_met_file(mx_met_xref_filename, __metanetx_chem_xref_line_reader)
-    __process_cross_ref_info(mx_met_xref_filename, __metanetx_chem_xref_reader)
+    process_met_file(mx_chem_prop_filename, metanetx_chem_prop_line_reader)
+    process_cross_ref_info(mx_met_depr_filename, metanetx_chem_depr_reader)
+    process_met_file(mx_met_xref_filename, metanetx_chem_xref_line_reader)
+    process_cross_ref_info(mx_met_xref_filename, metanetx_chem_xref_reader)
 
     # Process BiGG database metabolite IDs
-    __process_met_file(bigg_metabolites_filename, __bigg_metabolites_line_reader)
-    __process_cross_ref_info(bigg_metabolites_filename, __bigg_models_xref_reader)
+    process_met_file(bigg_metabolites_filename, bigg_metabolites_line_reader)
+    process_cross_ref_info(bigg_metabolites_filename, bigg_models_xref_reader)
 
     # Process ModelSEED database metabolite IDs
-    __process_met_file(ms_met_filename, __modelseed_metabolites_line_reader)
-    __process_cross_ref_info(ms_met_filename, __modelseed_metabolites_xref_reader)
-    __process_cross_ref_info(ms_met_aliases_filename, __modelseed_met_aliases_reader)
+    process_met_file(ms_met_filename, modelseed_metabolites_line_reader)
+    process_cross_ref_info(ms_met_filename, modelseed_metabolites_xref_reader)
+    process_cross_ref_info(ms_met_aliases_filename, modelseed_met_aliases_reader)
 
     # Process reaction IDs from modelSEED, MetaNetX, and BiGG
-    __process_reac_file(ms_reac_filename, __modelSeed_reactions_line_reader)
-    __process_reac_file(ms_reac_pathways_filename, __modelSeed_reaction_pathways_line_reader)
-    __process_reac_file(mx_reac_prop_filename, __metanetx_reaction_prop_line_reader)
-    __process_reac_file(mx_reac_xref_filename, __metanetx_reaction_xref_line_reader)
-    __process_reac_file(bigg_reactions_filename, __bigg_reactions_line_reader)
+    process_reac_file(ms_reac_filename, modelSeed_reactions_line_reader)
+    process_reac_file(ms_reac_pathways_filename, modelSeed_reaction_pathways_line_reader)
+    process_reac_file(mx_reac_prop_filename, metanetx_reaction_prop_line_reader)
+    process_reac_file(mx_reac_xref_filename, metanetx_reaction_xref_line_reader)
+    process_reac_file(bigg_reactions_filename, bigg_reactions_line_reader)
 
-    __log("Cleaning reaction id mapping dictionary")
-    dict_any_reac_id_to_mergem_id, dict_mergem_id_to_reac_prop = __clean_id_mapping_dictionary(dict_any_reac_id_to_mergem_id,
-                                                                                               dict_mergem_id_to_reac_prop,
-                                                                                               for_reac=True)
+    log("Cleaning reaction id mapping dictionary")
+    reac_univ_id_dict, reac_univ_id_prop_dict = clean_id_mapping_dictionary(reac_univ_id_dict,
+                                                                              reac_univ_id_prop_dict,
+                                                                              for_reac=True)
 
-    __log("Creating reaction id pickle")
-    with open(pickle_dir + 'reactionIdMapper.p', 'wb') as file:
-        dump(dict_any_reac_id_to_mergem_id, file)
-
-    __log("Creating reaction info pickle")
-    with open(pickle_dir + 'reactionInfo.p', 'wb') as file:
-        dump(dict_mergem_id_to_reac_prop, file)
-
-    __log("Cleaning metabolite id dictionary")
-    dict_any_met_id_to_mergem_id, dict_mergem_id_to_met_prop = __clean_id_mapping_dictionary(dict_any_met_id_to_mergem_id,
-                                                                                             dict_mergem_id_to_met_prop)
-
-    __log("Creating metabolite id pickle")
-    with open(pickle_dir + 'metaboliteIdMapper.p', 'wb') as file:
-        dump(dict_any_met_id_to_mergem_id, file)
-
-    __log("Creating metabolite info pickle")
-    with open(pickle_dir + 'metaboliteInfo.p', 'wb') as file:
-        dump(dict_mergem_id_to_met_prop, file)
+    log("Cleaning metabolite id dictionary")
+    met_univ_id_dict, met_univ_id_prop_dict = clean_id_mapping_dictionary(met_univ_id_dict,
+                                                                            met_univ_id_prop_dict)
 
     toc = perf_counter()
-    __log("")
-    __log(f"All database identifiers processed in {(toc - tic) / 60:0.3f} min")
-    __log("")
+    log("")
+    log(f"All database identifiers processed in {(toc - tic) / 60:0.3f} min")
+    log("")
     print(f"New ID mapping tables created.")
 
-
-def __return_mapping_and_info_dicts():
-    """
-    Checks if reaction and metabolite mapping pickles exist in data directory and loads dictionary
-    from pickles if they exist. Creates new pickles if they do not exist. \n
-    :return: dictionaries of reaction id mapper, reaction info, metabolite id mapper, metabolite info
-    """
-    pickle_filenames = ['reactionIdMapper.p', 'reactionInfo.p', 'metaboliteIdMapper.p', 'metaboliteInfo.p']
-    list_of_dictionaries = []
-
-    for filename in pickle_filenames:
-        if not os.path.exists(pickle_dir + filename):
-            global dict_any_reac_id_to_mergem_id, dict_mergem_id_to_reac_prop, dict_any_met_id_to_mergem_id, \
-                dict_mergem_id_to_met_prop
-            __create_id_mapping_pickle()
-            return [dict_any_reac_id_to_mergem_id, dict_mergem_id_to_reac_prop, dict_any_met_id_to_mergem_id,
-                    dict_mergem_id_to_met_prop]
-        else:
-            f = open(pickle_dir + filename, "rb")
-            mapping_or_info_dict = load(f)
-            list_of_dictionaries.append(mapping_or_info_dict)
-            f.close()
-
-    return list_of_dictionaries
+    return met_univ_id_dict, met_univ_id_prop_dict, reac_univ_id_dict, reac_univ_id_prop_dict
