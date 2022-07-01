@@ -94,6 +94,7 @@ def merge(input_models, set_objective='merge'):
                     met_sources_dict[old_met_id].add(model_index)
                 else:
                     met_sources_dict[old_met_id] = {model_index}
+                    merged_model_metabolites.append(metabolite)
             elif old_met_id in met_sources_dict: # priority is given to original metabolite ids
                 met_sources_dict[old_met_id].add(model_index)
             elif new_met_id in met_sources_dict: # new metabolite id previously found
@@ -117,11 +118,11 @@ def merge(input_models, set_objective='merge'):
             else:
                 metabolite.id = new_met_id
                 met_sources_dict[new_met_id] = {model_index}
+                merged_model_metabolites.append(metabolite)
                 if new_met_id in met_model_id_dict:
                     met_model_id_dict[new_met_id].append(old_met_id)
                 else:
                     met_model_id_dict[new_met_id] = [old_met_id]
-                merged_model_metabolites.append(metabolite)
 
         for reaction in model.reactions:
             reac_id = reaction.id
