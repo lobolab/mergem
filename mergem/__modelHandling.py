@@ -115,32 +115,32 @@ def map_to_metabolite_mergem_id(metabolite):
     """
     Takes a metabolite object as input and returns mergem_id notation for metabolite
     :param metabolite: Cobra metabolite object
-    :return: mergem_id notation for the metabolite
+    :return: mergem_id notation for the metabolite or None if there is no mapping
     """
     met_univ_id = __mergem_met_id_dict.get(metabolite.id)
 
     split = None
-    if met_univ_id is None:
+    if met_univ_id is None: # Re-check mapping without compartment
         if '@' in metabolite.id:
             split = metabolite.id.rsplit('@', 1)
         else:
             split = metabolite.id.rsplit("_", 1)
-        met_univ_id =  __mergem_met_id_dict.get(split[0])
+        met_univ_id = __mergem_met_id_dict.get(split[0])
+        if met_univ_id is None:
+            return None
 
     met_compartment = map_localization(metabolite.compartment)
-    if (met_compartment == ''):
-        if (split is None):
+    if met_compartment == '':
+        if split is None:
             if '@' in metabolite.id:
                 split = metabolite.id.rsplit('@', 1)
             else:
                 split = metabolite.id.rsplit("_", 1)
         met_compartment = map_localization(split[1])
-    if (met_compartment == ''):
-        met_compartment = split[1]
+        if met_compartment == '':
+            met_compartment = split[1]
 
-    met_mergem_id = "mergem_" + str(met_univ_id) + "_" + met_compartment
-
-    return met_mergem_id
+    return "mergem_" + str(met_univ_id) + "_" + met_compartment
 
 
 # create a reaction that contains input model objective reacs merged together

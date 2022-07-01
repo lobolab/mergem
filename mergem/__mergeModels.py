@@ -73,7 +73,7 @@ def merge(input_models, set_objective='merge'):
         old_met_id = metabolite.id
         new_met_id = __modelHandling.map_to_metabolite_mergem_id(metabolite)
 
-        if new_met_id in met_sources_dict:
+        if (new_met_id is None) or (new_met_id in met_sources_dict):
             met_sources_dict[old_met_id] = {0}
         else:
             met_sources_dict[new_met_id] = {0}
@@ -108,7 +108,12 @@ def merge(input_models, set_objective='merge'):
             old_met_id = metabolite.id
             new_met_id = __modelHandling.map_to_metabolite_mergem_id(metabolite)
 
-            if old_met_id in met_sources_dict: # priority is given to original metabolite ids
+            if new_met_id is None:
+                if old_met_id in met_sources_dict:
+                    met_sources_dict[old_met_id].add(model_index)
+                else:
+                    met_sources_dict[old_met_id] = {model_index}
+            elif old_met_id in met_sources_dict: # priority is given to original metabolite ids
                 met_sources_dict[old_met_id].add(model_index)
             elif new_met_id in met_sources_dict: # new metabolite id previously found
                 old_met_ids = met_model_id_dict[new_met_id]
