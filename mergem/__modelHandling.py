@@ -113,31 +113,27 @@ def load_reac_univ_id_prop_dict():
     reac_univ_id_prop_dict = load_dict(reac_univ_id_prop_dict, reac_univ_id_prop_dict_file)
 
 
-def update_id_mapper():
+def update_id_mapper(delete_database_files = True):
     """
     Downloads the latest database files,
-    merges the database identifiers based on common properties and saves the mapping table as a pickle.
+    merges the database identifiers based on common properties and saves the mapping tables as pickles.
     """
     global met_univ_id_dict, met_univ_id_prop_dict, reac_univ_id_dict, reac_univ_id_prop_dict
 
-    print("Building ID mapping and properties information.")
-    met_univ_id_dict, met_univ_id_prop_dict, reac_univ_id_dict, reac_univ_id_prop_dict = build_id_mapping()
+    met_univ_id_dict, met_univ_id_prop_dict, reac_univ_id_dict, reac_univ_id_prop_dict = \
+        build_id_mapping(delete_database_files)
 
-    log("Creating reaction id pickle")
-    with open(pickle_dir + 'reactionIdMapper.p', 'wb') as file:
-        dump(dict_any_reac_id_to_univ_id, file)
+    with open(met_univ_id_dict_file, 'wb') as file:
+        dump(met_univ_id_dict, file)
 
-    log("Creating reaction info pickle")
-    with open(pickle_dir + 'reactionInfo.p', 'wb') as file:
-        dump(dict_univ_id_to_reac_prop, file)
+    with open(met_univ_id_prop_dict_file, 'wb') as file:
+        dump(met_univ_id_prop_dict, file)
 
-    log("Creating metabolite id pickle")
-    with open(pickle_dir + 'metaboliteIdMapper.p', 'wb') as file:
-        dump(dict_any_met_id_to_univ_id, file)
+    with open(reac_univ_id_dict_file, 'wb') as file:
+        dump(reac_univ_id_dict, file)
 
-    log("Creating metabolite info pickle")
-    with open(pickle_dir + 'metaboliteInfo.p', 'wb') as file:
-        dump(dict_univ_id_to_met_prop, file)
+    with open(reac_univ_id_prop_dict_file, 'wb') as file:
+        dump(reac_univ_id_prop_dict, file)
 
 
 # convert cellular localization to single namespace

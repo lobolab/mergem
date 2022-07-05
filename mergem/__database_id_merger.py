@@ -19,7 +19,6 @@ import ssl
 
 curr_dir = os.path.dirname(__file__)
 files_dir = os.path.join(curr_dir, "downloads/")
-pickle_dir = os.path.join(curr_dir, "data/")
 log_dir = os.path.join(curr_dir, "logs/")
 
 # Database URLs
@@ -107,9 +106,6 @@ def log(message):
 def create_directories():
     if not os.path.exists(files_dir):
         os.makedirs(files_dir)
-
-    if not os.path.exists(pickle_dir):
-        os.makedirs(pickle_dir)
 
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
@@ -958,7 +954,7 @@ def remove_conflicting_id(db_id, fl_id_to_update, info_dict):
 
 
 # Main program
-def build_id_mapping():
+def build_id_mapping(delete_database_files):
     """
     Main function that downloads database files and processes them to merge identifiers into a mapping dictionary.
     Mapping dictionary is serialized and saved.
@@ -976,7 +972,7 @@ def build_id_mapping():
 
     toc = perf_counter()
     log("")
-    log(f"All metabolite files downloaded in {(toc - tic) / 60:0.3f} min")
+    log(f"All files downloaded in {(toc - tic) / 60:0.3f} min")
 
     log("Processing metabolites")
     tic = perf_counter()
@@ -1018,6 +1014,10 @@ def build_id_mapping():
     log("Cleaning metabolite id dictionary")
     met_univ_id_dict, met_univ_id_prop_dict = clean_id_mapping_dictionary(met_univ_id_dict,
                                                                             met_univ_id_prop_dict)
+
+    if(delete_database_files):
+        log("Deleting downloads")
+        os.remove(files_dir)
 
     toc = perf_counter()
     log("")

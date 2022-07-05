@@ -6,7 +6,7 @@
 
     Copyright (c) Lobo Lab (https://lobolab.umbc.edu)
 """
-from .__modelHandling import met_univ_id_dict, load_met_univ_id_dict, load_model, proton_mergem_id
+from . import __modelHandling
 import cobra
 
 
@@ -20,13 +20,13 @@ def merge(input_models, set_objective='merge'):
     :return: A dictionary of the merged model, met & reac jaccard distances, num of mets and reacs merged,
             and met & reac sources.
     """
-    load_met_univ_id_dict()
+    __modelHandling.load_met_univ_id_dict()
     models = []
 
     for input_model in input_models:
         if isinstance(input_model, str):
             try:
-                input_model = load_model(input_model)
+                input_model = __modelHandling.load_model(input_model)
                 models.append(input_model)
 
             except Exception as e:
@@ -209,26 +209,28 @@ def map_metabolite_to_mergem_id(metabolite):
     :param metabolite: Cobra metabolite object
     :return: mergem_id notation for the metabolite or None if there is no mapping
     """
-    met_univ_id = met_univ_id_dict.get(metabolite.id)
+    met_id = metabolite.id.lstrip('_') # remove leading underscores
+
+    met_univ_id = __modelHandling.met_univ_id_dict.get(met_id)
 
     split = None
     if met_univ_id is None: # Re-check mapping without compartment
-        if '@' in metabolite.id:
-            split = metabolite.id.rsplit('@', 1)
+        if '@' in met_id:
+            split = met_id.rsplit('@', 1)
         else:
-            split = metabolite.id.rsplit("_", 1)
-        met_univ_id = met_univ_id_dict.get(split[0])
+            split = met_id.rsplit("_", 1)
+        met_univ_id = __modelHandling.met_univ_id_dict.get(split[0])
         if met_univ_id is None:
             return None
 
-    met_compartment = map_localization(metabolite.compartment)
+    met_compartment = __modelHandling.map_localization(metabolite.compartment)
     if met_compartment == '':
         if split is None:
-            if '@' in metabolite.id:
-                split = metabolite.id.rsplit('@', 1)
+            if '@' in met_id:
+                split = met_id.rsplit('@', 1)
             else:
-                split = metabolite.id.rsplit("_", 1)
-        met_compartment = map_localization(split[1])
+                split = met_id.rsplit("_", 1)
+        met_compartment = __modelHandling.map_localization(split[1])
         if met_compartment == '':
             met_compartment = split[1]
 
@@ -246,7 +248,7 @@ def create_reaction_key(reaction):
     reac_metabolite_set = set()
     reac_rev_met_set = set()
     for reactant in reaction.reactants:
-        if (not reactant.id.startswith(proton_mergem_id)) and (reactant.id[-1] != 'b') and (reactant.name != "PMF"):
+        if (not reactant.id.startswith(__modelHandling.proton_mergem_id)) and (reactant.id[-1] != 'b') and (reactant.name != "PMF"):
             id = reactant.id if reactant.id.startswith('mergem_') else map_metabolite_to_mergem_id(reactant)
             metabolite_set = (id, -1)
             rev_met_set = (id, 1)
@@ -254,7 +256,7 @@ def create_reaction_key(reaction):
             reac_rev_met_set.add(rev_met_set)
 
     for product in reaction.products:
-        if (not product.id.startswith(proton_mergem_id)) and (product.id[-1] != 'b') and (product.name != "PMF"):
+        if (not product.id.startswith(__modelHandling.proton_mergem_id)) and (product.id[-1] != 'b') and (product.name != "PMF"):
             id = product.id if product.id.startswith('mergem_') else map_metabolite_to_mergem_id(product)
             metabolite_set = (id, 1)
             rev_met_set = (id, -1)
