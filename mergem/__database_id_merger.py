@@ -1017,7 +1017,7 @@ def build_id_mapping(delete_database_files):
 
     if(delete_database_files):
         log("Deleting downloads")
-        os.remove(files_dir)
+        shutil.rmtree(files_dir)
 
     toc = perf_counter()
     log("")
