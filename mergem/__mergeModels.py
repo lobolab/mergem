@@ -7,6 +7,7 @@
     Copyright (c) Lobo Lab (https://lobolab.umbc.edu)
 """
 from . import __modelHandling
+from . import __version
 import cobra
 
 
@@ -39,14 +40,14 @@ def merge(input_models, set_objective='merge'):
     met_model_id_dict, met_sources_dict, reac_sources_dict, merged_model_reactions_dict = {}, {}, {}, {}
 
     merged_model_id = 'mergem'
-    merged_model_name = 'Mergem'
+    merged_model_name = 'Mergem of '
     merged_model_metabolites = []
     merged_model_reactions = []
 
     # Add first model
     model = models[0]
     merged_model_id += '_' + model.id
-    merged_model_name += '; ' + (model.name if model.name else model.id)
+    merged_model_name += model.name if model.name else model.id
     model_objectives = []
 
     for metabolite in model.metabolites:
@@ -152,6 +153,8 @@ def merge(input_models, set_objective='merge'):
                     reac_sources_dict[reac_id] = {model_index}
 
         objective_reactions.append(model_objectives)
+
+    merged_model_name += ' (mergem v' + __version._version + ')'
 
     merged_model = cobra.Model(merged_model_id, merged_model_name)
     merged_model.add_metabolites(merged_model_metabolites)
