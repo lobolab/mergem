@@ -6,7 +6,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 exec(open("./mergem/__version.py").read())
 
 setup(name='mergem',
-      version=version,
+      version=_version,
       description='Merge two or more genome scale metabolic models.',
       long_description=long_description,
       long_description_content_type="text/markdown",
