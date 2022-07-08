@@ -34,22 +34,26 @@ To print statistics on the input models and the merging, enter the :code:`-v` ar
 
 Once the models are merged, input model Jaccard distances and the number of metabolites and reactions merged are printed
 to the console.
-Jaccard distances are printed as a list of the metabolic and reaction distances of each model from the first model.
-The list follows the format :math:`[(JD_{M_1} , JD_{R_1}) , (JD_{M_2} , JD_{R_2}) , .. (JD_{M_n} , JD_{R_n}) ]` where
-:math:`JD_{M_i}` and :math:`JD_{R_i}` are metabolite and reaction Jaccard distances for model :math:`i` and :math:`1, 2, .. n` are the model
-numbers in order of input.
+
+Jaccard distances are printed as a matrix with the metabolic and reaction Jaccard distances of pairs of input models.
+The matrix follows the format shown below:
+
+.. image:: jaccardDistance.png
+    :width: 600
+
+where :math:`J(M_i, M_j)` and :math:`J(R_i, R_j)` represent the metabolite and reaction Jaccard distances between models
+:math:`i` and :math:`j`.
 
 Statistics are printed in the format as shown in the example below:
 
 ::
 
-    Model (Met, Reac) jaccard distances: [(0, 0), (0.0, 0.5)]
+    Model (Met, Reac) jaccard distances: [(0, 0), (0, 0)]
     Mets merged: 72
     Reacs merged: 94
 
 In the above case, two models were merged. A Jaccard distance of 0 indicates close match with reference model.
-Thus the first model is an exact match of itself and the second model has the same metabolites as first model but is
-different in reactions.
+Thus the two models are an exact match of each other.
 The result also shows that 72 metabolites and 94 reactions were merged between the two
 models.
 
@@ -68,15 +72,17 @@ within which each metabolite and reaction were found.
 
     merge_results = merge([model1, model2])
 
-Individual results can be accessed using the dictionary keys :code:`merged_model` , :code:`jacc_d` , :code:`Met_merged` , :code:`Reac_merged` , :code:`Met_sources` , and
-:code:`Reac_sources` as shown below:
+Individual results can be accessed using the dictionary keys :code:`merged_model` , :code:`jacc_matrix` ,
+:code:`num_met_merged` , :code:`num_reac_merged` , :code:`met_sources` , and
+:code:`reac_sources` as shown below:
 
 ::
 
     merged_model_obj = merge_results['merged_model']
-    jaccard_distances = merge_results['jacc_d']
-    num_mets_merged = merge_results['Met_merged']
-    num_reacs_merged = merge_results['Reac_merged']
-    metabolite_sources = merge_results['Met_sources']
-    reaction_sources = merge_results['Reac_sources']
+    jaccard_distances = merge_results['jacc_matrix']
+    num_mets_merged = merge_results['num_met_merged']
+    num_reacs_merged = merge_results['num_reac_merged']
+    metabolite_sources = merge_results['met_sources']
+    reaction_sources = merge_results['reac_sources']
+
 

@@ -1,5 +1,6 @@
+*************************************************
 Visually comparing genome-scale metabolic models
-===================================================
+*************************************************
 
 Visualizing the components of each input model with different colors can help compare and visually identify the
 components that are common between all models or unique to a single model. The large size of genome-scale metabolic

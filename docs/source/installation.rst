@@ -1,7 +1,8 @@
 .. _installation:
 
+*******************************
 Installing the mergem package
-=====================================
+*******************************
 
 mergem can be installed from PyPI using pip installer:
 

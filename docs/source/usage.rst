@@ -1,6 +1,6 @@
-
+*********************************
 Using mergem to merge models
-=================================
+*********************************
 mergem can merge two or more genome-scale metabolic models. The command-line execution can take input models in
 various COBRApy compatible formats (SBML, JSON, YAML, and MAT).
 mergem can be imported into a python script and the merge function can take cobra objects in addition to filenames.
@@ -12,7 +12,7 @@ model.
 .. _cli:
 
 Command-line execution
---------------------------
+==========================
 Once mergem has been installed using pip, the following commands can be run on the command-line.
 Printing help text displays all the options.
 
@@ -69,7 +69,10 @@ specified in the extension (.xml, ...):
 .. _python-import:
 
 Python import
----------------------
+=======================
+
+Merge models
+-----------------
 
 Import the mergem package to use its modules within a python script:
 
@@ -86,3 +89,24 @@ Provide the list of models to be merged:
 
 where the models can be COBRApy model objects, or filenames and objective can be 'merge' or
 model number ('1', 2', '3', etc.).
+
+
+Other mergem functions
+---------------------------
+
+The following functions can also be imported from mergem:
+
+::
+
+    from mergem import load_model, save_model, map_localization, map_metabolite_univ_id, map_reaction_univ_id,
+                        get_metabolite_properties, get_reaction_properties, update_id_mapper
+
+
+
+To import all:
+
+::
+
+    from mergem import *
+
+

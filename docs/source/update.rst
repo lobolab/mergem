@@ -1,5 +1,6 @@
+******************************************
 Updating Database ID mapping dictionaries
--------------------------------------------
+******************************************
 
 The mergem algorithm uses database ID mapping dictionaries to map model metabolite identifiers into an internal identifier
 that allows for comparison and merging of metabolites. Updating the mapping dictionary involves downloading the latest
