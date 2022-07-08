@@ -6,7 +6,16 @@
     Copyright (c) Lobo Lab (https://lobolab.umbc.edu)
 """
 
-import cobra.io
+import cobra
+# This hack solves the problem of cobrapy replacements introducing non-alphanumeric ASCII characters in ids,
+# which breaks the glpk solver and crashes the Python kernel
+# See _f_reaction in sbml.py in cobrapy: __(NUMBER)__ replaced with the character value of NUMBER
+from typing import Match
+def _number_to_chr_safe(numberStr: Match) -> str:
+    ascii = chr(int(numberStr.group(1)))
+    return numberStr.group(1) if cobra.io.sbml.pattern_to_sbml.match(ascii) else ascii
+cobra.io.sbml._number_to_chr = _number_to_chr_safe
+
 from pickle import dump, load
 import os
 from .__database_id_merger import build_id_mapping
