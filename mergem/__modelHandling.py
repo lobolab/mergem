@@ -7,13 +7,13 @@
 """
 
 import cobra
-# This hack solves the problem of cobrapy replacements introducing non-alphanumeric ASCII characters in ids,
+# This hack solves the problem of cobrapy replacements introducing control ASCII characters in ids,
 # which breaks the glpk solver and crashes the Python kernel
 # See _f_reaction in sbml.py in cobrapy: __(NUMBER)__ replaced with the character value of NUMBER
 from typing import Match
 def _number_to_chr_safe(numberStr: Match) -> str:
-    ascii = chr(int(numberStr.group(1)))
-    return numberStr.group(1) if cobra.io.sbml.pattern_to_sbml.match(ascii) else ascii
+    ascii = int(numberStr.group(1))
+    return numberStr.group(1) if (ascii <= 31 or ascii == 127) else chr(ascii)
 cobra.io.sbml._number_to_chr = _number_to_chr_safe
 
 from pickle import dump, load
