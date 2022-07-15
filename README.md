@@ -60,8 +60,10 @@ metabolite and reaction model sources.
 ------
 Citation
 ======
-Please cite mergem using:
-* [mergem: A python package for the unification of genome scale metabolic models](doi:)
+Please cite mergem using: <br>
+<br> [mergem: merging and comparing genome-scale metabolic models using universal identifiers](https://doi.org/10.1101/2022.07.14.499633)
+<br> A. Hari, D. Lobo.
+<br> <b>bioRxiv</b>, doi:10.1101/2022.07.14.499633, 2022
 
 ------
 

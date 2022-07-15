@@ -1,7 +1,9 @@
 *******************************
 Citing mergem
 *******************************
+Please cite mergem using:
 
-A. Hari, D. Lobo. "mergem: A user-friendly tool for merging and comparing genome-scale metabolic models."
-*In preparation* (2022)
+ | `mergem: merging and comparing genome-scale metabolic models using universal identifiers <https://doi.org/10.1101/2022.07.14.499633>`_
+ | A. Hari, D. Lobo.
+ | **bioRxiv** , doi:10.1101/2022.07.14.499633 , 2022
 
