@@ -16,7 +16,7 @@ To install the latest release
 
 Usage
 ------
-For detailed usage instructions, please refer to the help [documentation](https://readthedocs.io).
+For detailed usage instructions, please refer to the help [documentation](https://mergem.readthedocs.io/en/latest/).
 
 #### Command-line usage
 Command-line options can be viewed using "--help" flag, as shown below:
