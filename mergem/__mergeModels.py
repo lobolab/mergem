@@ -304,7 +304,7 @@ def create_merged_objective(merged_model, reac_sources_dict, objective_reactions
     :param objective_reactions: list of objective reaction lists to merge
     :return: Merged model with its objective set to the merged objective reactions
     """
-    merged_obj_reaction_id = 'merged'
+    merged_obj_reaction_id = 'merged-objectives'
     merged_obj_reaction_name = 'Merged all objectives'
     st_dict = {}
     metabolite_dict = {}
@@ -318,7 +318,6 @@ def create_merged_objective(merged_model, reac_sources_dict, objective_reactions
 
                 st_dict[metabolite.id].add(reaction.metabolites[metabolite])
 
-            merged_obj_reaction_id += '-' + reaction.id
             merged_obj_reaction_name += '; ' + reaction.name
 
     if len(st_dict):
