@@ -327,7 +327,7 @@ def create_merged_objective(merged_model, reac_sources_dict, objective_reactions
             avg_stoichiometry = sum(met_stoichiometries)/len(met_stoichiometries)
             merged_obj_reaction.add_metabolites({metabolite_dict[metabolite_id]: avg_stoichiometry})
 
-        merged_model.add_reaction(merged_obj_reaction)
+        merged_model.add_reactions([merged_obj_reaction])
         merged_model.objective = merged_obj_reaction_id
 
         reac_sources_dict[merged_obj_reaction_id] = list(range(0, len(objective_reactions)))
