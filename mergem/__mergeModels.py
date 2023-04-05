@@ -233,9 +233,10 @@ def map_metabolite_to_mergem_id(metabolite):
                 split = met_id.rsplit('@', 1)
             else:
                 split = met_id.rsplit("_", 1)
-        met_compartment = __modelHandling.map_localization(split[1])
-        if met_compartment == '':
-            met_compartment = split[1]
+        if len(split) > 1:
+            met_compartment = __modelHandling.map_localization(split[1])
+            if met_compartment == '':
+                met_compartment = split[1]
 
     return "mergem_" + str(met_univ_id) + "_" + met_compartment
 
