@@ -209,22 +209,24 @@ def remove_localization(id):
         return id.rsplit("_", 1)[0]
 
 
-def save_mapping_tables():
+def save_mapping_tables(metabolites_file_name = 'mergem_univ_id_mapper_metabolites.csv',
+                        reactions_file_name = 'mergem_univ_id_mapper_reactions.csv'):
     """
     Saves database id mapping tables as CSV files
     """
     if not met_univ_id_prop_dict:
         load_met_univ_id_prop_dict()
+    if not reac_univ_id_prop_dict:
         load_reac_univ_id_prop_dict()
 
-    property_dicts = {'metabolite_univ_id_mapper.csv': met_univ_id_prop_dict,
-                      'reaction_univ_id_mapper.csv': reac_univ_id_prop_dict}
+    property_dicts = {metabolites_file_name: met_univ_id_prop_dict,
+                      reactions_file_name: reac_univ_id_prop_dict}
 
     for filename, property_dict in property_dicts.items():
         list_univ_ext_ids = []
         for univ_id, prop in property_dict.items():
             list_ids = [univ_id]
-            list_ids += [db_id for db_id in sorted(prop['ids'])]
+            list_ids += sorted(prop['ids'])
             list_univ_ext_ids += [list_ids]
 
         with open(filename, 'w', newline='') as f:
