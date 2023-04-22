@@ -23,8 +23,9 @@ _allowed_file_formats = ["sbml", "xml", "mat", "m", "matlab", "json", "yaml"]
 @click.option('-o', nargs=1, help='Save model as (filename with format .xml, .sbml, etc.)')
 @click.option('-v', help='Print merging statistics', is_flag=True)
 @click.option('-up', help='Update ID mapping table', is_flag=True)
+@click.option('-s', help='Save ID mapping table as CSV', is_flag=True)
 @click.version_option(_version + "\nLobo Lab (https://lobolab.umbc.edu)")
-def main(input_filenames, obj, o=None, v=False, up=False):
+def main(input_filenames, obj, o=None, v=False, up=False, s=False):
     """
     mergem takes genome-scale metabolic models as input, merges them into a single model
     and saves the merged model as .xml. Users can optionally select the objective and provide
@@ -44,6 +45,13 @@ def main(input_filenames, obj, o=None, v=False, up=False):
         click.secho('Updating ID mapper. This process may take a few hours.. ')
         mergem.update_id_mapper()
         click.secho('ID mapper updated. ', fg='green')
+        if len(model_filenames) == 0:
+            sys.exit()
+
+    if s:
+        click.secho('Saving ID mapper as CSV file.  ')
+        mergem.save_mapping_tables()
+        click.secho('ID mapping tables saved. ', fg='green')
         if len(model_filenames) == 0:
             sys.exit()
 

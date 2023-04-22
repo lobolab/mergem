@@ -19,6 +19,7 @@ cobra.io.sbml._number_to_chr = _number_to_chr_safe
 from pickle import dump, load
 import os
 from .__database_id_merger import build_id_mapping
+import csv
 
 met_univ_id_dict, met_univ_id_prop_dict, reac_univ_id_dict, reac_univ_id_prop_dict = {}, {}, {}, {}
 
@@ -206,3 +207,26 @@ def remove_localization(id):
         return id.rsplit('@', 1)[0]
     else:
         return id.rsplit("_", 1)[0]
+
+
+def save_mapping_tables():
+    """
+    Saves database id mapping tables as CSV files
+    """
+    if not met_univ_id_prop_dict:
+        load_met_univ_id_prop_dict()
+        load_reac_univ_id_prop_dict()
+
+    property_dicts = {'metabolite_univ_id_mapper.csv': met_univ_id_prop_dict,
+                      'reaction_univ_id_mapper.csv': reac_univ_id_prop_dict}
+
+    for filename, property_dict in property_dicts.items():
+        list_univ_ext_ids = []
+        for univ_id, prop in property_dict.items():
+            list_ids = [univ_id]
+            list_ids += [db_id for db_id in sorted(prop['ids'])]
+            list_univ_ext_ids += [list_ids]
+
+        with open(filename, 'w', newline='') as f:
+            write = csv.writer(f)
+            write.writerows(list_univ_ext_ids)
