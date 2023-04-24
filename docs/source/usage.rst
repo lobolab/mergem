@@ -11,7 +11,7 @@ model.
 
 .. _cli:
 
-Command-line execution
+Command-line
 ==========================
 Once mergem has been installed using pip, the following commands can be run on the command-line.
 Printing help text displays all the options.

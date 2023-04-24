@@ -31,6 +31,8 @@ Documentation for Fluxer based merging can be found on its `tutorial page <https
    output
    visualize
    update
+   mapper
+   examples
    citation
    acknowledgements
    license

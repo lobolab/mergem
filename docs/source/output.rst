@@ -48,7 +48,7 @@ Statistics are printed in the format as shown in the example below:
 
 ::
 
-    Model (Met, Reac) jaccard distances: [(0, 0), (0, 0)]
+    Jaccard distance matrix: [[0, 0], [0, 0]]
     Mets merged: 72
     Reacs merged: 94
 

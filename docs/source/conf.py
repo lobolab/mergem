@@ -18,11 +18,11 @@
 # -- Project information -----------------------------------------------------
 
 project = 'mergem'
-copyright = '2022, The Lobo Lab'
+copyright = '2023, The Lobo Lab'
 author = 'The Lobo Lab'
 
 # The full version, including alpha/beta/rc tags
-release = '0.21'
+release = '0.22'
 
 
 # -- General configuration ---------------------------------------------------
