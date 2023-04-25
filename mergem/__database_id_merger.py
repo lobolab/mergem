@@ -331,7 +331,7 @@ def process_kegg_compounds(filename):
         ids = ["kegg:" + kegg_id]
 
         if len(properties['chebi']) > 0:
-            ids += [properties['chebi'][0]]
+            ids += [chebi_id for chebi_id in properties['chebi']]
 
         property_dict = {'ids': ids,
                          'Name': properties['Name'],
@@ -859,7 +859,7 @@ def add_values_to_property_list(property_list, prop_value, for_name=False):
 
 def merge_identifiers(source_id, other_id, for_reac=False):
     """
-    Merges the two met IDs into lowest univ ID only if at least two properties match.
+    Merges the two met IDs into lowest univ ID.
     :param source_id: primary metabolite ID from database being processed
     :param other_id: cross referenced metabolite ID to be mapped to primary met ID
     """
