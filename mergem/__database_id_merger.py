@@ -167,7 +167,8 @@ def download_kegg_compounds(filename):
     for compound in kegg_compounds_list:
         if "\t" in compound:
             split_text = compound.split('\t', 1)
-            kegg_id = (split_text[0]).split(':', 1)[1]
+            spl = (split_text[0]).split(':', 1)
+            kegg_id = spl[1] if len(spl) > 1 else split_text[0]
             kegg_compounds_dict[kegg_id] = {'Name': [], 'mass': [], 'formula': [], 'chebi': []}
 
             compound_info_request = requests.get("http://rest.kegg.jp/get/" + kegg_id)
@@ -331,7 +332,7 @@ def process_kegg_compounds(filename):
         ids = ["kegg:" + kegg_id]
 
         if len(properties['chebi']) > 0:
-            ids += [chebi_id for chebi_id in properties['chebi']]
+            ids += properties['chebi']
 
         property_dict = {'ids': ids,
                          'Name': properties['Name'],
