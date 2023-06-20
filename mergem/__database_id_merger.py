@@ -966,7 +966,7 @@ def build_id_mapping(delete_database_files):
     print("Creating directories")
     create_directories()
 
-    log("Downloading files")
+    log("Downloading files (this can take several hours)")
     tic = perf_counter()
 
     download_database_files()

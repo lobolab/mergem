@@ -24,10 +24,14 @@ import csv
 met_univ_id_dict, met_univ_id_prop_dict, reac_univ_id_dict, reac_univ_id_prop_dict = {}, {}, {}, {}
 
 curr_dir = os.path.dirname(__file__)
-met_univ_id_dict_file = os.path.join(curr_dir, 'data', 'metaboliteIdMapper.p')
-met_univ_id_prop_dict_file = os.path.join(curr_dir, 'data', 'metaboliteInfo.p')
-reac_univ_id_dict_file = os.path.join(curr_dir, 'data', 'reactionIdMapper.p')
-reac_univ_id_prop_dict_file = os.path.join(curr_dir, 'data', 'reactionInfo.p')
+data_dir = os.path.join(curr_dir, 'data')
+if not os.path.exists(data_dir):
+    os.makedirs(data_dir)
+
+met_univ_id_dict_file = os.path.join(data_dir, 'metaboliteIdMapper.p')
+met_univ_id_prop_dict_file = os.path.join(data_dir, 'metaboliteInfo.p')
+reac_univ_id_dict_file = os.path.join(data_dir, 'reactionIdMapper.p')
+reac_univ_id_prop_dict_file = os.path.join(data_dir, 'reactionInfo.p')
 
 localization_dict = {'p': 'p', 'p0': 'p', 'periplasm': 'p', 'periplasm_0': 'p', 'mnxc19': 'p',
                      'c': 'c', 'c0': 'c', 'cytosol': 'c', 'cytosol_0': 'c', 'cytoplasm': 'c', 'mnxc3': 'c',
@@ -92,12 +96,13 @@ def save_model(cobra_model, file_name):
 
 def load_dict(dict, file):
     if not dict:
-        if os.path.exists(file):
-            f = open(file, "rb")
-            dict = load(f)
-            f.close()
-        else:
+        if not os.path.exists(file):
+            print("Dictionary not found. Updating mapping dictionaries...")
             update_id_mapper()
+
+        f = open(file, "rb")
+        dict = load(f)
+        f.close()
 
     return dict
 
