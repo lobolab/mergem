@@ -7,3 +7,8 @@ Please cite mergem using:
  | A. Hari, D. Lobo.
  | **bioRxiv** , doi:10.1101/2022.07.14.499633 , 2022
 
+Contributors:
+
+ | `Archana Hari <https://www.linkedin.com/in/archana-hari/>`_
+ | `Arveen Zarrabi <https://www.linkedin.com/in/arveen-zarrabi/>`_
+ | `Daniel Lobo <http://biology.umbc.edu/directory/faculty/person/DQ02490/>`_

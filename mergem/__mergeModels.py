@@ -13,10 +13,10 @@ import cobra
 
 # merges models in a list to the template/first model
 # set_objective can be an integer for model obj or 'merge'
-def merge(input_models, set_objective='merge'):
+def merge(input_models, set_objective='merge', exact_sto=False):
     """
     Takes a list of cobra models or file names as input and merges them into a single model with the chosen objective. \n
-    :param input_models: list of cobra models or file names
+    :param input_models: list of cobr+a models or file names
     :param set_objective: objective reaction from one of the models or merge (default) all model objectives
     :return: A dictionary of the merged model, met & reac jaccard distances, num of mets and reacs merged,
             and met & reac sources.
@@ -67,12 +67,12 @@ def merge(input_models, set_objective='merge'):
 
     for reaction in model.reactions:
         reac_id = reaction.id
-        if reac_id in str(model.objective): # processing objective reactions
+        if reac_id in str(model.objective):  # processing objective reactions
             model_objectives.append(reaction)
         else:
             merged_model_reactions.append(reaction)
             reac_sources_dict[reac_id] = {0}
-            reaction_key, rev_reaction_key = create_reaction_key(reaction)
+            reaction_key, rev_reaction_key = create_reaction_key(reaction, exact_sto)
             if not reaction_key in merged_model_reactions_dict:
                 merged_model_reactions_dict[reaction_key] = reac_id
 
@@ -96,20 +96,20 @@ def merge(input_models, set_objective='merge'):
                 else:
                     met_sources_dict[old_met_id] = {model_index}
                     merged_model_metabolites.append(metabolite)
-            elif old_met_id in met_sources_dict: # priority is given to original metabolite ids
+            elif old_met_id in met_sources_dict:  # priority is given to original metabolite ids
                 met_sources_dict[old_met_id].add(model_index)
-            elif new_met_id in met_sources_dict: # new metabolite id previously found
+            elif new_met_id in met_sources_dict:  # new metabolite id previously found
                 old_met_ids = met_model_id_dict[new_met_id]
-                if (old_met_id not in old_met_ids) and any(id in old_met_ids for id in model_metabolite_ids): # model has a better match
+                if (old_met_id not in old_met_ids) and any(id in old_met_ids for id in model_metabolite_ids):  # model has a better match
                     met_sources_dict[old_met_id] = {model_index}
                     merged_model_metabolites.append(metabolite)
-                elif model_index in met_sources_dict[new_met_id]: # model already had a metabolite for this mergem id
-                    for reaction in metabolite.reactions: # replace id in its reactions
+                elif model_index in met_sources_dict[new_met_id]:  # model already had a metabolite for this mergem id
+                    for reaction in metabolite.reactions:  # replace id in its reactions
                         if new_met_id in [met.id for met in reaction.metabolites]: # new metabolite id conflict, keep it
-                            if old_met_id not in met_sources_dict: # first reaction with conflict
+                            if old_met_id not in met_sources_dict:  # first reaction with conflict
                                 met_sources_dict[old_met_id] = {model_index}
                                 merged_model_metabolites.append(metabolite)
-                        else: # substitute metabolite in reaction
+                        else:  # substitute metabolite in reaction
                             st_coeff = reaction.metabolites[metabolite]
                             reaction.add_metabolites({old_met_id: -st_coeff})
                             reaction.add_metabolites({new_met_id: st_coeff})
@@ -127,10 +127,10 @@ def merge(input_models, set_objective='merge'):
 
         for reaction in model.reactions:
             reac_id = reaction.id
-            if reac_id in str(model.objective): # processing objective reactions
+            if reac_id in str(model.objective):  # processing objective reactions
                 model_objectives.append(reaction)
             else:
-                reaction_key, rev_reaction_key = create_reaction_key(reaction)
+                reaction_key, rev_reaction_key = create_reaction_key(reaction, exact_sto)
                 if reaction_key in merged_model_reactions_dict:
                     existing_reac_id = merged_model_reactions_dict[reaction_key]
                     reac_sources_dict[existing_reac_id].add(model_index)
@@ -153,6 +153,7 @@ def merge(input_models, set_objective='merge'):
                     reac_sources_dict[reac_id] = {model_index}
 
         objective_reactions.append(model_objectives)
+
 
     merged_model_name += ' (mergem v' + __version._version + ')'
 
@@ -212,12 +213,12 @@ def map_metabolite_to_mergem_id(metabolite):
     :param metabolite: Cobra metabolite object
     :return: mergem_id notation for the metabolite or None if there is no mapping
     """
-    met_id = metabolite.id.lstrip('_') # remove leading underscores
+    met_id = metabolite.id.lstrip('_')  # remove leading underscores
 
     met_univ_id = __modelHandling.met_univ_id_dict.get(met_id)
 
     split = None
-    if met_univ_id is None: # Re-check mapping without compartment
+    if met_univ_id is None:  # Re-check mapping without compartment
         if '@' in met_id:
             split = met_id.rsplit('@', 1)
         else:
@@ -242,11 +243,12 @@ def map_metabolite_to_mergem_id(metabolite):
 
 
 # reaction key is a frozenset of tuples of participating mets with their stoichiometric coeffs
-def create_reaction_key(reaction):
+def create_reaction_key(reaction, exact_sto):
     """
     Takes a reaction object as input and creates a key(frozen set) of all pairs of metabolite ID and stoichiometric
     coefficients. \n
     :param reaction: Cobra reaction object
+    :param exact_sto: Reaction stoichiometric coefficient
     :return: frozen set of pairs of IDs of participating metabolite and their stoichiometric coefficients
     """
     reac_metabolite_set = set()
@@ -254,16 +256,18 @@ def create_reaction_key(reaction):
     for reactant in reaction.reactants:
         if (not reactant.id.startswith(__modelHandling.proton_mergem_id)) and (reactant.id[-1] != 'b') and (reactant.name != "PMF"):
             id = reactant.id if reactant.id.startswith('mergem_') else map_metabolite_to_mergem_id(reactant)
-            metabolite_set = (id, -1)
-            rev_met_set = (id, 1)
+            stoc = reaction.metabolites[reactant] if exact_sto else 1
+            metabolite_set = (id, -stoc)
+            rev_met_set = (id, stoc)
             reac_metabolite_set.add(metabolite_set)
             reac_rev_met_set.add(rev_met_set)
 
     for product in reaction.products:
         if (not product.id.startswith(__modelHandling.proton_mergem_id)) and (product.id[-1] != 'b') and (product.name != "PMF"):
             id = product.id if product.id.startswith('mergem_') else map_metabolite_to_mergem_id(product)
-            metabolite_set = (id, 1)
-            rev_met_set = (id, -1)
+            stoc = reaction.metabolites[product] if exact_sto else 1
+            metabolite_set = (id, stoc)
+            rev_met_set = (id, -stoc)
             reac_metabolite_set.add(metabolite_set)
             reac_rev_met_set.add(rev_met_set)
 

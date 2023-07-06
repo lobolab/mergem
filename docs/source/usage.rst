@@ -16,7 +16,7 @@ Command-line
 Once mergem has been installed using pip, the following commands can be run on the command-line.
 Printing help text displays all the options.
 
-.. code-block:: none
+::
 
     > mergem --help
     Usage: mergem [OPTIONS] [INPUT_FILENAMES]...
@@ -31,6 +31,8 @@ Printing help text displays all the options.
     -o TEXT    Save model as (filename with format .xml, .sbml, etc.)
     -v         Print merging statistics
     -up        Update ID mapping table
+    -s         Save ID mapping table as CSV
+    -e         Uses exact stoichiometry for merging
     --version  Show the version and exit.
     --help     Show this message and exit.
 
@@ -64,6 +66,20 @@ specified in the extension (.xml, ...):
 ::
 
     mergem model.xml model2.xml -obj 1 -o mergedmodel.xml
+
+
+Save the ID mapping table as a CSV file by using the :code:`-s` argument:
+
+::
+
+    mergem model1.xml model2.xml -obj 1 -s
+
+
+To use the exact stoichiometry of the metabolites for merging, use the :code:`-e` argument:
+
+::
+
+    mergem model1.xml model2.xml -obj 1 -e
 
 
 .. _python-import:

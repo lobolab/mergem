@@ -24,8 +24,9 @@ _allowed_file_formats = ["sbml", "xml", "mat", "m", "matlab", "json", "yaml"]
 @click.option('-v', help='Print merging statistics', is_flag=True)
 @click.option('-up', help='Update ID mapping table', is_flag=True)
 @click.option('-s', help='Save ID mapping table as CSV', is_flag=True)
+@click.option('-e', help='Uses exact stoichiometry for merging', is_flag=True)
 @click.version_option(_version + "\nLobo Lab (https://lobolab.umbc.edu)")
-def main(input_filenames, obj, o=None, v=False, up=False, s=False):
+def main(input_filenames, obj, o=None, v=False, up=False, s=False, e=False):
     """
     mergem takes genome-scale metabolic models as input, merges them into a single model
     and saves the merged model as .xml. Users can optionally select the objective and provide
@@ -77,7 +78,7 @@ def main(input_filenames, obj, o=None, v=False, up=False, s=False):
             sys.exit()
         input_list_of_models.append(input_model)
 
-    merge_results = mergem.merge(input_list_of_models, objective)
+    merge_results = mergem.merge(input_list_of_models, set_objective=objective, exact_sto=e)
     result_merged_model = merge_results['merged_model']
 
     try:
