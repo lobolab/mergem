@@ -31,6 +31,8 @@ Command-line options can be viewed using "--help" flag, as shown below:
     -o TEXT    Save model as (filename with format .xml, .sbml, etc.)
     -v         Print merging statistics
     -up        Update metabolite ID mapping table
+    -s         Save ID mapping table as CSV
+    -e         Uses exact stoichiometry for merging
     --version  Show the version and exit.
     --help     Show this message and exit.
  

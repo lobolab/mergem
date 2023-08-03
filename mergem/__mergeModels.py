@@ -18,6 +18,7 @@ def merge(input_models, set_objective='merge', exact_sto=False):
     Takes a list of cobra models or file names as input and merges them into a single model with the chosen objective. \n
     :param input_models: list of cobr+a models or file names
     :param set_objective: objective reaction from one of the models or merge (default) all model objectives
+    :param exact_sto: Boolean which determines whether exact stoichiometry of metabolites is used during merging
     :return: A dictionary of the merged model, met & reac jaccard distances, num of mets and reacs merged,
             and met & reac sources.
     """
@@ -154,6 +155,9 @@ def merge(input_models, set_objective='merge', exact_sto=False):
 
         objective_reactions.append(model_objectives)
 
+    if exact_sto:
+        merged_model_id += '_exactsto'
+        merged_model_name += ' with exact stoichiometry'
 
     merged_model_name += ' (mergem v' + __version._version + ')'
 
