@@ -32,7 +32,7 @@ Command-line options can be viewed using "--help" flag, as shown below:
     -v         Print merging statistics
     -up        Update metabolite ID mapping table
     -s         Save ID mapping table as CSV
-    -e         Uses exact stoichiometry for merging
+    -e         Uses exact stoichiometry when merging reactions
     --version  Show the version and exit.
     --help     Show this message and exit.
  
@@ -44,7 +44,7 @@ To print merging statistics, append the "-v" flag:
 
     mergem -i model1.xml -i model2.xml -obj 1 -v 
 
-#### Importing mergem
+#### Python usage
 
 To use mergem modules within a python script, simply import the package within the script:
 
@@ -52,11 +52,15 @@ To use mergem modules within a python script, simply import the package within t
 
 Provide the list of models to be merged as a list to the merge function:
 
-    merge_results = mergem.merge([model1, model2,..], objective)
+    merge_results = mergem.merge(input_models, set_objective='merge', exact_sto=False)
 
-where objective can be 'merge' or model index ('1', '2', '3', etc).
+* `input_models` is a list of COBRApy model objects or strings specifying file names.
+* `set_objective` specifies if the objective functions are merged ('merge') or copied from a single model (specifying the index of the model: '1', 2', '3', etc.).
+* `exact_sto` is set to true for using exact stoichiometry when merging reactions.
+
+
 The merge function returns a dictionary of results including the merged model,
-the metabolite and reaction jaccard distances of each model with respect to first model, and the 
+the metabolite and reaction Jaccard distances of each model with respect to the first model, and the 
 metabolite and reaction model sources. 
 
 ------

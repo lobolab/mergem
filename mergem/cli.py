@@ -24,7 +24,7 @@ _allowed_file_formats = ["sbml", "xml", "mat", "m", "matlab", "json", "yaml"]
 @click.option('-v', help='Print merging statistics', is_flag=True)
 @click.option('-up', help='Update ID mapping table', is_flag=True)
 @click.option('-s', help='Save ID mapping table as CSV', is_flag=True)
-@click.option('-e', help='Uses exact stoichiometry for merging', is_flag=True)
+@click.option('-e', help='Uses exact stoichiometry when merging reactions', is_flag=True)
 @click.version_option(_version + "\nLobo Lab (https://lobolab.umbc.edu)")
 def main(input_filenames, obj, o=None, v=False, up=False, s=False, e=False):
     """

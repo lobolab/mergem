@@ -19,7 +19,7 @@ Printing help text displays all the options.
 ::
 
     > mergem --help
-    Usage: mergem [OPTIONS] [INPUT_FILENAMES]...
+    Usage: mergem [INPUT_FILENAMES] [OPTIONS]
 
     mergem takes genome-scale metabolic models as input, merges them into a
     single model and saves merged model as .xml. Users can optionally select the
@@ -32,7 +32,7 @@ Printing help text displays all the options.
     -v         Print merging statistics
     -up        Update ID mapping table
     -s         Save ID mapping table as CSV
-    -e         Uses exact stoichiometry for merging
+    -e         Uses exact stoichiometry when merging reactions
     --version  Show the version and exit.
     --help     Show this message and exit.
 
@@ -75,7 +75,7 @@ Save the ID mapping table as a CSV file by using the :code:`-s` argument:
     mergem model1.xml model2.xml -obj 1 -s
 
 
-To use the exact stoichiometry of the metabolites for merging, use the :code:`-e` argument:
+By default, reactions are merged when they have both a similar set of reactants and a similar set of products, without comparing their stoichiometry. To merge reactions only when they have the same exact stoichiometry in their reactants and products, use the :code:`-e` argument:
 
 ::
 
@@ -84,7 +84,7 @@ To use the exact stoichiometry of the metabolites for merging, use the :code:`-e
 
 .. _python-import:
 
-Python import
+Python
 =======================
 
 Merge models
@@ -101,10 +101,11 @@ Provide the list of models to be merged:
 
 ::
 
-    merge_results = mergem.merge([model1, model2, ..], objective)
+    merge_results = mergem.merge(input_models, set_objective='merge', exact_sto=False)
 
-where the models can be COBRApy model objects, or filenames and objective can be 'merge' or
-model number ('1', 2', '3', etc.).
+* :code:`input_models` is a list of COBRApy model objects or strings specifying file names.
+* :code:`set_objective` specifies if the objective functions are merged ('merge') or copied from a single model (specifying the index of the model: '1', 2', '3', etc.).
+* :code:`exact_sto` is set to true for using exact stoichiometry when merging reactions.
 
 
 Other mergem functions
