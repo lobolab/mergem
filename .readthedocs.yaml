@@ -8,3 +8,8 @@ build:
 python:
   install:
     - requirements: docs/requirements.txt
+
+formats:
+  - pdf
+  - epub
+  - htmlzip
