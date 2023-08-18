@@ -46,11 +46,11 @@ To print merging statistics, append the "-v" flag:
 
 #### Python usage
 
-To use mergem modules within a python script, simply import the package within the script:
+To use mergem  within a python script, simply import the package with:
 
     import mergem
 
-Provide the list of models to be merged as a list to the merge function:
+For merging two or more models, provide a list of models to the merge function:
 
     merge_results = mergem.merge(input_models, set_objective='merge', exact_sto=False)
 
@@ -60,7 +60,7 @@ Provide the list of models to be merged as a list to the merge function:
 
 
 The merge function returns a dictionary of results including the merged model,
-the metabolite and reaction Jaccard distances of each model with respect to the first model, and the 
+the metabolite and reaction Jaccard distance matrix between models, and the 
 metabolite and reaction model sources. 
 
 ------

@@ -22,7 +22,7 @@ copyright = '2023, The Lobo Lab'
 author = 'The Lobo Lab'
 
 # The full version, including alpha/beta/rc tags
-release = '0.22'
+release = '0.23.1'
 
 
 # -- General configuration ---------------------------------------------------
