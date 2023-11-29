@@ -10,16 +10,28 @@ from . import __modelHandling
 from . import __version
 import cobra
 
+# merges models in a list to the template/first model
+# set_objective can be an integer for model obj or 'merge'
+def translate(input_model, trans_to_db=None):
+    """
+    Translates metabolite and reaction IDs to a target namespace (kegg, metanetx, modelseed, bigg, chebi)
+    :param input_model: a cobra model or file name
+    :param trans_to_db: target database to be translated to
+    :return: model with translated metabolite IDs.
+    """
+    return merge([input_model], trans_to_db=trans_to_db)['merged_model']
+
 
 # merges models in a list to the template/first model
 # set_objective can be an integer for model obj or 'merge'
-def merge(input_models, set_objective='merge', exact_sto=False):
+def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None):
     """
     Takes a list of cobra models or file names as input and merges them into a single model with the chosen objective. \n
     :param input_models: list of cobr+a models or file names
     :param set_objective: objective reaction from one of the models or merge (default) all model objectives
     :param exact_sto: Boolean which determines whether exact stoichiometry of metabolites is used during merging
-    :return: A dictionary of the merged model, met & reac jaccard distances, num of mets and reacs merged,
+    :param trans_to_db: target database to be translated to
+    :return: a dictionary of the merged model, met & reac jaccard distances, num of mets and reacs merged,
             and met & reac sources.
     """
     __modelHandling.load_met_univ_id_dict()
@@ -183,8 +195,24 @@ def merge(input_models, set_objective='merge', exact_sto=False):
     # Revert mergem ids and convert sources to lists
     met_sources_dict = {met_model_id_dict.get(met_id, [met_id])[0]: list(sources) for (met_id, sources) in met_sources_dict.items()}
     reac_sources_dict = {reac_id : list(sources) for (reac_id, sources) in reac_sources_dict.items()}
+    if trans_to_db:
+        trans_to_db += ':'
+
     for metabolite in merged_model.metabolites:
-        old_met_id = met_model_id_dict.get(metabolite.id, [metabolite.id])[0]
+        if trans_to_db:
+            met_id_array = metabolite.id.split("_")
+            if met_id_array[0] == "mergem":
+                met_id = int(met_id_array[1] if len(met_id_array) > 1 else metabolite.id)
+                met_props = __modelHandling.get_metabolite_properties(met_id)
+                met_ids = met_props['ids']
+                old_met_id = next(((s[len(trans_to_db):] + '_' + met_id_array[2]) for s in met_ids if s.startswith(trans_to_db)),
+                                  met_model_id_dict.get(metabolite.id, [metabolite.id])[0])
+            else:
+                old_met_id = met_model_id_dict.get(metabolite.id, [metabolite.id])[0]
+        else:
+            old_met_id = met_model_id_dict.get(metabolite.id, [metabolite.id])[0]
+
+
         if old_met_id != metabolite.id:
             if old_met_id in merged_model.metabolites:
                 alt_old_met_id = old_met_id
@@ -196,6 +224,34 @@ def merge(input_models, set_objective='merge', exact_sto=False):
                 met_sources_dict[alt_old_met_id] = met_sources_dict[old_met_id]
                 old_met_id = alt_old_met_id
             metabolite.id = old_met_id
+
+    # Translate reaction IDs
+    if trans_to_db:
+        for reaction in merged_model.reactions:
+            reac_mergem_id = __modelHandling.map_reaction_univ_id(reaction.id)
+            # safeguard if original database was translated
+            if (not reac_mergem_id) and ('_' in reac_mergem_id):
+                reac_mergem_id = __modelHandling.map_reaction_univ_id('_'.join(reaction.id.split('_')[:-1]))
+
+            if reac_mergem_id:
+                reac_ids = __modelHandling.get_reaction_properties(reac_mergem_id)['ids']
+
+                new_reac_id = next(
+                    ((s[len(trans_to_db):]) for s in reac_ids if s.startswith(trans_to_db)),
+                    None)
+
+                if new_reac_id:
+                    if new_reac_id in merged_model.reactions:
+                        i = 2
+                        while new_reac_id + '_' + str(i) in merged_model.reactions:
+                            i = i + 1
+
+                        new_reac_id = new_reac_id + '_' + str(i)
+
+                    reaction.id = new_reac_id
+
+
+
 
     merged_model.repair()
 
@@ -291,7 +347,7 @@ def set_objective_expression(merged_model, reac_sources_dict, models, objective_
     :param set_objective: 'merge' all input model objective reacs or from one of the input models.
     :return: model with its objective expression set.
     """
-    if set_objective == 'merge':
+    if len(models) > 1 and set_objective == 'merge':
         merged_model, reac_sources_dict = create_merged_objective(merged_model, reac_sources_dict, objective_reactions)
     else:
         model_num = int(set_objective) - 1

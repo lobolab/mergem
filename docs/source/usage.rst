@@ -33,6 +33,7 @@ Printing help text displays all the options.
     -up        Update ID mapping table
     -s         Save ID mapping table as CSV
     -e         Uses exact stoichiometry when merging reactions
+    -t         Translate metabolite and reaction IDs to a target namespace (chebi, metacyc, kegg, reactome, metanetx, hmdb, biocyc, bigg, seed, sabiork, rhea)
     --version  Show the version and exit.
     --help     Show this message and exit.
 
@@ -82,6 +83,13 @@ By default, reactions are merged when they have both a similar set of reactants 
     mergem model1.xml model2.xml -obj 1 -e
 
 
+Translate the ID of a metabolite from that used in a database (kegg, metanetx, modelseed, bigg, chebi) to that of another using the :code:`-t` argument:
+
+::
+
+    mergem model1.xml -t chebi
+
+
 .. _python-import:
 
 Python
@@ -119,8 +127,25 @@ The following functions can also be imported from mergem:
                         get_metabolite_properties, get_reaction_properties, update_id_mapper
 
 
+:code:`load_model` loads a model from the given filename/path.
 
-To import all:
+:code:`save_model` takes a cobra model as input and exports as file_name.
+
+:code:`map_localization` converts localization suffixes into common notation.
+
+:code:`map_metabolite_univ_id` maps metabolite id to metabolite universal id.
+
+:code:`map_reaction_univ_id` maps reaction id to metabolite universal id.
+
+:code:`get_metabolite_properties` retrieves the properties of a metabolite using its universal id
+
+:code:`get_reaction_properties` retrieves the properties of a reaction using its universal id
+
+:code:`update_id_mapper` downloads the latest database files, merges the database identifiers based on common properties and saves the mapping tables as pickles.
+
+
+
+All the functions can be imported at once with:
 
 ::
 

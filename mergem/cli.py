@@ -25,12 +25,13 @@ _allowed_file_formats = ["sbml", "xml", "mat", "m", "matlab", "json", "yaml"]
 @click.option('-up', help='Update ID mapping table', is_flag=True)
 @click.option('-s', help='Save ID mapping table as CSV', is_flag=True)
 @click.option('-e', help='Uses exact stoichiometry when merging reactions', is_flag=True)
+@click.option('-t', help='Translate all metabolite and reaction IDs to a target namespace (chebi, metacyc, kegg, reactome, metanetx, hmdb, biocyc, bigg, seed, sabiork, rhea)')
 @click.version_option(_version + "\nLobo Lab (https://lobolab.umbc.edu)")
-def main(input_filenames, obj, o=None, v=False, up=False, s=False, e=False):
+def main(input_filenames, obj, o=None, v=False, up=False, s=False, e=False, t=None):
     """
     mergem takes genome-scale metabolic models as input, merges them into a single model
-    and saves the merged model as .xml. Users can optionally select the objective and provide
-    an output filename for the merged model.
+    and saves the merged model as .xml. Users can optionally select the objective, provide
+    an output filename for the merged model, and translate the models to a different namespace.
 
     Lobo Lab (https://lobolab.umbc.edu)
     """
@@ -56,8 +57,8 @@ def main(input_filenames, obj, o=None, v=False, up=False, s=False, e=False):
         if len(model_filenames) == 0:
             sys.exit()
 
-    if len(model_filenames) < 2:
-        click.secho('Error: Enter 2 or more models to merge.', fg='red')
+    if len(model_filenames) < 1:
+        click.secho('Error: Enter one or more models to merge or translate.', fg='red')
         sys.exit()
 
     if (objective != 'merge') and (not(int(obj) <= len(model_filenames))):
@@ -78,7 +79,7 @@ def main(input_filenames, obj, o=None, v=False, up=False, s=False, e=False):
             sys.exit()
         input_list_of_models.append(input_model)
 
-    merge_results = mergem.merge(input_list_of_models, set_objective=objective, exact_sto=e)
+    merge_results = mergem.merge(input_list_of_models, set_objective=objective, exact_sto=e, trans_to_db=t)
     result_merged_model = merge_results['merged_model']
 
     try:

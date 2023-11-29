@@ -194,13 +194,19 @@ def map_reaction_univ_id(reac_id):
 
 
 def get_metabolite_properties(met_univ_id):
+    """
+    Retrieves the properties of a metabolite using its universal id
+    """
     if not met_univ_id_prop_dict:
         load_met_univ_id_prop_dict()
-
+    #mergem dictionary
     return met_univ_id_prop_dict.get(met_univ_id)
 
 
 def get_reaction_properties(reac_univ_id):
+    """
+    Retrieves the properties of a reaction using its universal id
+    """
     if not reac_univ_id_prop_dict:
         load_reac_univ_id_prop_dict()
 
