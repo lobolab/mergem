@@ -230,7 +230,7 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
         for reaction in merged_model.reactions:
             reac_mergem_id = __modelHandling.map_reaction_univ_id(reaction.id)
             # safeguard if original database was translated
-            if (not reac_mergem_id) and ('_' in reac_mergem_id):
+            if (not reac_mergem_id) and ('_' in reaction.id):
                 reac_mergem_id = __modelHandling.map_reaction_univ_id('_'.join(reaction.id.split('_')[:-1]))
 
             if reac_mergem_id:
@@ -350,7 +350,7 @@ def set_objective_expression(merged_model, reac_sources_dict, models, objective_
     if len(models) > 1 and set_objective == 'merge':
         merged_model, reac_sources_dict = create_merged_objective(merged_model, reac_sources_dict, objective_reactions)
     else:
-        model_num = int(set_objective) - 1
+        model_num = int(1 if set_objective == 'merge' else set_objective) - 1
         reactions = objective_reactions[model_num]
         if len(reactions):
             merged_model.add_reactions(reactions)

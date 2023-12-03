@@ -19,13 +19,13 @@ _allowed_file_formats = ["sbml", "xml", "mat", "m", "matlab", "json", "yaml"]
 @click.command(no_args_is_help=True)
 @click.argument('input_filenames', nargs=-1, type=click.Path(exists=True))
 @click.option('-obj', nargs=1, default='merge',
-              help="Set objective: 'merge' all objectives (default) or 1, 2, 3.. (objective from one of the input models)")
+              help="Set objective: 'merge' all objectives (default) or 1, 2, 3... (objective from one of the input models)")
 @click.option('-o', nargs=1, help='Save model as (filename with format .xml, .sbml, etc.)')
 @click.option('-v', help='Print merging statistics', is_flag=True)
 @click.option('-up', help='Update ID mapping table', is_flag=True)
 @click.option('-s', help='Save ID mapping table as CSV', is_flag=True)
 @click.option('-e', help='Uses exact stoichiometry when merging reactions', is_flag=True)
-@click.option('-t', help='Translate all metabolite and reaction IDs to a target namespace (chebi, metacyc, kegg, reactome, metanetx, hmdb, biocyc, bigg, seed, sabiork, rhea)')
+@click.option('-t', help='Translate all metabolite and reaction IDs to a target namespace (chebi, metacyc, kegg, reactome, metanetx, hmdb, biocyc, bigg, seed, sabiork, or rhea)')
 @click.version_option(_version + "\nLobo Lab (https://lobolab.umbc.edu)")
 def main(input_filenames, obj, o=None, v=False, up=False, s=False, e=False, t=None):
     """

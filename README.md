@@ -22,19 +22,23 @@ For detailed usage instructions, please refer to the help [documentation](https:
 Command-line options can be viewed using "--help" flag, as shown below:
 
     > mergem --help
-    Usage: mergem [OPTIONS]
+    Usage: mergem [OPTIONS] [INPUT_FILENAMES]...
+
+    mergem takes genome-scale metabolic models as input, merges them into a single model and saves the merged model as .xml. Users can optionally select the objective, provide an output filename for the merged model, and translate the models to a different namespace.
+
+    Lobo Lab (https://lobolab.umbc.edu)
 
     Options:
-    -i TEXT    Input model filenames
-    -obj TEXT  Set objective: 'merge' all objectives (default) or 1, 2, 3..
-             (objective from one of the input models)
-    -o TEXT    Save model as (filename with format .xml, .sbml, etc.)
+    -obj TEXT  Set objective: 'merge' all objectives (default) or 1, 2, 3... (objective from one of the input models)  
+    -o TEXT    Save model as (filename with format .xml, .sbml, etc.)  
     -v         Print merging statistics
-    -up        Update metabolite ID mapping table
+    -up        Update ID mapping table
     -s         Save ID mapping table as CSV
     -e         Uses exact stoichiometry when merging reactions
+    -t TEXT    Translate all metabolite and reaction IDs to a target namespace (chebi, metacyc, kegg, reactome, metanetx, hmdb, biocyc, bigg, seed, sabiork, or rhea)
     --version  Show the version and exit.
     --help     Show this message and exit.
+
  
 For merging two models and setting objective of merged model from first model, use:
 

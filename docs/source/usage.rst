@@ -26,14 +26,14 @@ Printing help text displays all the options.
     objective and provide an output filename for merged model.
 
     Options:
-    -obj TEXT  Set objective: 'merge' all objectives (default) or 1, 2, 3..
+    -obj TEXT  Set objective: 'merge' all objectives (default) or 1, 2, 3...
              (objective from one of the input models)
     -o TEXT    Save model as (filename with format .xml, .sbml, etc.)
     -v         Print merging statistics
     -up        Update ID mapping table
     -s         Save ID mapping table as CSV
     -e         Uses exact stoichiometry when merging reactions
-    -t         Translate metabolite and reaction IDs to a target namespace (chebi, metacyc, kegg, reactome, metanetx, hmdb, biocyc, bigg, seed, sabiork, rhea)
+    -t         Translate metabolite and reaction IDs to a target namespace (chebi, metacyc, kegg, reactome, metanetx, hmdb, biocyc, bigg, seed, sabiork, or rhea)
     --version  Show the version and exit.
     --help     Show this message and exit.
 

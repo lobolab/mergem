@@ -1,8 +1,8 @@
+/.*/
 /dist/
-/.idea/
+/build/
 /mergem/data/
 /mergem/downloads/
 /mergem/logs/
 /mergem.egg-info/
 __pycache__
-/_test
