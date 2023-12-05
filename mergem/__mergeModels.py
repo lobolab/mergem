@@ -24,7 +24,8 @@ def translate(input_model, trans_to_db=None):
 
 # merges models in a list to the template/first model
 # set_objective can be an integer for model obj or 'merge'
-def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None, ignore_protonation=True):
+def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None, ignore_protonation=True,
+          use_mergem_annot=False):
     """
     Takes a list of cobra models or file names as input and merges them into a single model with the chosen objective. \n
     :param input_models: list of cobr+a models or file names
@@ -32,6 +33,7 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
     :param exact_sto: Boolean which determines whether exact stoichiometry of metabolites is used during merging
     :param trans_to_db: target database to be translated to
     :param ignore_protonation: boolean to ignore hydrogen and proton during reaction merging
+    :param use_mergem_annot: add additional annotation from mergem dictionaries
     :return: a dictionary of the merged model, met & reac jaccard distances, num of mets and reacs merged,
             and met & reac sources.
     """
@@ -74,10 +76,10 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
 
         if (new_met_id is None) or (new_met_id in met_sources_dict):
             met_sources_dict[old_met_id] = {0}
-            dict_met_annot[old_met_id] = metabolite.annotation  # add annotation
+            dict_met_annot[old_met_id] = __modelHandling.add_annotation(old_met_id, metabolite, use_mergem_annot, True)
         else:
             met_sources_dict[new_met_id] = {0}
-            dict_met_annot[new_met_id] = metabolite.annotation  # add annotation
+            dict_met_annot[new_met_id] = __modelHandling.add_annotation(new_met_id, metabolite, use_mergem_annot, True)
             if new_met_id in met_model_id_dict:
                 met_model_id_dict[new_met_id].append(old_met_id)
             else:
@@ -94,9 +96,8 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
             reaction_key, rev_reaction_key = create_reaction_key(reaction, exact_sto, ignore_protonation)
             if not reaction_key in merged_model_reactions_dict:
                 merged_model_reactions_dict[reaction_key] = reac_id
-
             dict_reaction_gprs[reac_id] = reaction.gpr
-            dict_reac_annot[reac_id] = reaction.annotation  # add annotation
+            dict_reac_annot[reac_id] = __modelHandling.add_annotation(reac_id, reaction, use_mergem_annot, False)
     objective_reactions.append(model_objectives)
 
     # Merge rest of models
@@ -118,7 +119,7 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
                 else:
                     met_sources_dict[old_met_id] = {model_index}
                     merged_model_metabolites.append(metabolite)
-                    dict_met_annot[old_met_id] = metabolite.annotation  # add annotation
+                    dict_met_annot[old_met_id] = __modelHandling.add_annotation(old_met_id, metabolite, use_mergem_annot, True)
 
             elif old_met_id in met_sources_dict:  # priority is given to original metabolite ids
                 met_sources_dict[old_met_id].add(model_index)
@@ -129,7 +130,7 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
                 if (old_met_id not in old_met_ids) and any(id in old_met_ids for id in model_metabolite_ids):  # model has a better match
                     met_sources_dict[old_met_id] = {model_index}
                     merged_model_metabolites.append(metabolite)
-                    dict_met_annot[old_met_id] = metabolite.annotation  # add annotation
+                    dict_met_annot[old_met_id] = __modelHandling.add_annotation(old_met_id, metabolite, use_mergem_annot, True)
 
                 elif model_index in met_sources_dict[new_met_id]:  # model already had a metabolite for this mergem id
                     for reaction in metabolite.reactions:  # replace id in its reactions
@@ -137,8 +138,7 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
                             if old_met_id not in met_sources_dict:  # first reaction with conflict
                                 met_sources_dict[old_met_id] = {model_index}
                                 merged_model_metabolites.append(metabolite)
-                                dict_met_annot[old_met_id] = metabolite.annotation  # add annotation
-
+                                dict_met_annot[old_met_id] = __modelHandling.add_annotation(old_met_id, metabolite, use_mergem_annot, True)
                         else:  # substitute metabolite in reaction
                             st_coeff = reaction.metabolites[metabolite]
                             reaction.add_metabolites({old_met_id: -st_coeff})
@@ -151,7 +151,7 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
                 metabolite.id = new_met_id
                 met_sources_dict[new_met_id] = {model_index}
                 merged_model_metabolites.append(metabolite)
-                dict_met_annot[new_met_id] = metabolite.annotation  # add annotation
+                dict_met_annot[new_met_id] = __modelHandling.add_annotation(new_met_id, metabolite, use_mergem_annot, True)
                 if new_met_id in met_model_id_dict:
                     met_model_id_dict[new_met_id].append(old_met_id)
                 else:
@@ -199,7 +199,7 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
                     merged_model_reactions_dict[reaction_key] = reac_id
                     reac_sources_dict[reac_id] = {model_index}
                     dict_reaction_gprs[reac_id] = reaction.gpr
-                    dict_reac_annot[reac_id] = reaction.annotation  # add annotation
+                    dict_reac_annot[reac_id] = __modelHandling.add_annotation(reac_id, reaction, use_mergem_annot, False)
 
         objective_reactions.append(model_objectives)
 

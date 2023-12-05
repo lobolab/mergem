@@ -268,32 +268,113 @@ def update_gpr(reaction_id, dict_reaction_gprs, add_gpr):
         return existing_gpr
 
 
-def update_annotation(object_id, merging_object, dict_annot):
+def update_annotation(object_id, merging_object, dict_annot, mergem_annot=None):
     '''
     Merges annotations when merging reactions and metabolites
     :param object_id: reaction or metabolite id
     :param merging_object: reaction or metabolite object
     :param dict_annot: dictionary of annotations
     '''
-    obj_annot = dict_annot[object_id]
-    merging_annot = merging_object.annotation
+
+    if not dict_annot:
+        obj_annot = merging_object.annotation
+        merging_annot = mergem_annot
+    else:
+        obj_annot = dict_annot[object_id]
+        merging_annot = merging_object.annotation
 
     for annot, new_annotation in merging_annot.items():
         if annot in obj_annot:
             existing_annotation = obj_annot[annot]
             if type(new_annotation) == str:
                 if (type(existing_annotation) == str) and (existing_annotation != new_annotation):
-                    existing_annotation = [new_annotation, existing_annotation]
+                    obj_annot[annot] = [new_annotation, existing_annotation]
 
                 elif (type(existing_annotation) == list) and (new_annotation not in existing_annotation):
-                    existing_annotation += [new_annotation]
+                    obj_annot[annot] += [new_annotation]
 
             elif type(new_annotation) == list:
-                if type(existing_annotation) == str:
-                    existing_annotation = [existing_annotation]
+                if (type(existing_annotation) == str):
+                    obj_annot[annot] = [existing_annotation]
 
-                existing_annotation += [annotation for annotation in new_annotation
+                obj_annot[annot] += [annotation for annotation in new_annotation
                                         if annotation not in existing_annotation]
         else:
             obj_annot[annot] = new_annotation
 
+
+def add_annotation(object_id, object, use_mergem_annot, is_metabolite=True):
+    '''
+    Returns annotation for reaction or metabolite
+    :param object_id: reaction or metabolite ID
+    :param object: reaction or metabolite object
+    :param use_mergem_annot: add additional annotation from mergem info dictionaries
+    :param is_metabolite: boolean to indicate if object is metabolite
+    :return: annotation for reaction or metabolite
+    '''
+    if use_mergem_annot:
+        if is_metabolite:
+            mergem_annotation = {'bigg.metabolite': [], 'chebi': [], 'inchikey': [], 'metanetx.chemical': [],
+                                 'seed.compound': []}
+
+            prop_dict = None
+
+            if 'mergem' in object_id:
+                prop_dict = get_metabolite_properties(int(object_id.split('mergem_', 1)[1].rsplit('_', 1)[0]))
+
+            else:
+                met_univ_id = map_metabolite_univ_id(object.id)
+                if met_univ_id:
+                    prop_dict = get_metabolite_properties(met_univ_id)
+
+            if prop_dict:
+                for db_ids in prop_dict['ids']:
+                    db_name, db_id = db_ids.split(':', 1)
+
+                    if 'bigg' in db_name:
+                        mergem_annotation['bigg.metabolite'] += [db_id]
+
+                    if 'chebi' in db_name:
+                        mergem_annotation['chebi'] += ['CHEBI:' + db_id]
+
+                    if 'metanetx' in db_name:
+                        mergem_annotation['metanetx.chemical'] += [db_id]
+
+                    if 'seed' in db_name:
+                        mergem_annotation['seed.compound'] += [db_id]
+
+                mergem_annotation['inchikey'] = prop_dict['inchikey']
+
+                if object.formula == '':
+                    object.formula = prop_dict['formula'][0]
+                if object.formula_weight == '':
+                    object.formula_weight = prop_dict['mass'][0]
+
+        else:
+            mergem_annotation = {'bigg.reaction': [], 'ec-code': [], 'reactome': [], 'metanetx.reaction': [],
+                                 'rhea': []}
+
+            reac_univ_id = map_reaction_univ_id(object.id)
+            if reac_univ_id:
+                prop_dict = get_reaction_properties(reac_univ_id)
+
+                for db_ids in prop_dict['ids']:
+                    db_name, db_id = db_ids.split(':', 1)
+
+                    if 'bigg' in db_name:
+                        mergem_annotation['bigg.reaction'] += [db_id]
+
+                    if 'rhea' in db_name:
+                        mergem_annotation['rhea'] += [db_id]
+
+                    if 'metanetx' in db_name:
+                        mergem_annotation['metanetx.reaction'] += [db_id]
+
+                    if 'reactome' in db_name:
+                        mergem_annotation['reactome'] += [db_id]
+
+                mergem_annotation['ec-code'] = prop_dict['EC_num']
+
+        update_annotation(object_id, object, None, mergem_annot=mergem_annotation)
+
+    return object.annotation
