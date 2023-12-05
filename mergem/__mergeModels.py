@@ -24,13 +24,14 @@ def translate(input_model, trans_to_db=None):
 
 # merges models in a list to the template/first model
 # set_objective can be an integer for model obj or 'merge'
-def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None):
+def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None, ignore_protonation=True):
     """
     Takes a list of cobra models or file names as input and merges them into a single model with the chosen objective. \n
     :param input_models: list of cobr+a models or file names
     :param set_objective: objective reaction from one of the models or merge (default) all model objectives
     :param exact_sto: Boolean which determines whether exact stoichiometry of metabolites is used during merging
     :param trans_to_db: target database to be translated to
+    :param ignore_protonation: boolean to ignore hydrogen and proton during reaction merging
     :return: a dictionary of the merged model, met & reac jaccard distances, num of mets and reacs merged,
             and met & reac sources.
     """
@@ -85,7 +86,7 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
         else:
             merged_model_reactions.append(reaction)
             reac_sources_dict[reac_id] = {0}
-            reaction_key, rev_reaction_key = create_reaction_key(reaction, exact_sto)
+            reaction_key, rev_reaction_key = create_reaction_key(reaction, exact_sto, ignore_protonation)
             if not reaction_key in merged_model_reactions_dict:
                 merged_model_reactions_dict[reaction_key] = reac_id
 
@@ -143,7 +144,7 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
             if reac_id in str(model.objective):  # processing objective reactions
                 model_objectives.append(reaction)
             else:
-                reaction_key, rev_reaction_key = create_reaction_key(reaction, exact_sto)
+                reaction_key, rev_reaction_key = create_reaction_key(reaction, exact_sto, ignore_protonation)
                 if reaction_key in merged_model_reactions_dict:
                     existing_reac_id = merged_model_reactions_dict[reaction_key]
                     reac_sources_dict[existing_reac_id].add(model_index)
@@ -284,6 +285,27 @@ def map_metabolite_to_mergem_id(metabolite):
         else:
             split = met_id.rsplit("_", 1)
         met_univ_id = __modelHandling.met_univ_id_dict.get(split[0])
+
+        if (met_univ_id is None) and ('mergem' not in met_id):  # no mapping for metabolite ID
+            for annot in metabolite.annotation:
+                if annot == 'sbo':
+                    continue
+                met_id_from_annot = metabolite.annotation[annot]  # get xref from annotation
+                if type(met_id_from_annot) == str:
+                    met_univ_id = __modelHandling.met_univ_id_dict.get(met_id_from_annot)
+                    if met_univ_id:
+                        break
+                else:  # if list of annotations for a db
+                    for annot_met_id in met_id_from_annot:
+                        if ':' in annot_met_id:
+                            split_annot_id = annot_met_id.split(':', 1)[1]
+                            met_univ_id = __modelHandling.met_univ_id_dict.get(split_annot_id)
+                        else:
+                            met_univ_id = __modelHandling.met_univ_id_dict.get(annot_met_id)
+                        if met_univ_id:
+                            break
+                if met_univ_id:
+                    break
         if met_univ_id is None:
             return None
 
@@ -303,18 +325,22 @@ def map_metabolite_to_mergem_id(metabolite):
 
 
 # reaction key is a frozenset of tuples of participating mets with their stoichiometric coeffs
-def create_reaction_key(reaction, exact_sto):
+def create_reaction_key(reaction, exact_sto, ignore_protonation):
     """
     Takes a reaction object as input and creates a key(frozen set) of all pairs of metabolite ID and stoichiometric
     coefficients. \n
     :param reaction: Cobra reaction object
     :param exact_sto: Reaction stoichiometric coefficient
+    :param ignore_protonation: Ignore hydrogen and protons
     :return: frozen set of pairs of IDs of participating metabolite and their stoichiometric coefficients
     """
     reac_metabolite_set = set()
     reac_rev_met_set = set()
     for reactant in reaction.reactants:
-        if (not reactant.id.startswith(__modelHandling.proton_mergem_id)) and (reactant.id[-1] != 'b') and (reactant.name != "PMF"):
+        if ignore_protonation and (reactant.id.startswith(__modelHandling.proton_mergem_id) or reactant.name == "PMF"):
+            continue
+
+        elif reactant.id[-1] != 'b':
             id = reactant.id if reactant.id.startswith('mergem_') else map_metabolite_to_mergem_id(reactant)
             stoc = reaction.metabolites[reactant] if exact_sto else 1
             metabolite_set = (id, -stoc)
@@ -323,7 +349,9 @@ def create_reaction_key(reaction, exact_sto):
             reac_rev_met_set.add(rev_met_set)
 
     for product in reaction.products:
-        if (not product.id.startswith(__modelHandling.proton_mergem_id)) and (product.id[-1] != 'b') and (product.name != "PMF"):
+        if ignore_protonation and (product.id.startswith(__modelHandling.proton_mergem_id) or product.name == "PMF"):
+            continue
+        elif product.id[-1] != 'b':
             id = product.id if product.id.startswith('mergem_') else map_metabolite_to_mergem_id(product)
             stoc = reaction.metabolites[product] if exact_sto else 1
             metabolite_set = (id, stoc)
