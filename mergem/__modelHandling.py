@@ -243,3 +243,57 @@ def save_mapping_tables(metabolites_file_name = 'mergem_univ_id_mapper_metabolit
         with open(filename, 'w', newline='') as f:
             write = csv.writer(f)
             write.writerows(list_univ_ext_ids)
+
+
+def update_gpr(reaction_id, dict_reaction_gprs, add_gpr):
+    '''
+    :param reaction_id: id of reaction for which gpr is being updated
+    :param dict_reaction_gprs: dictionary with all reaction gprs
+    :param add_gpr: new gpr to add to the existing gpr
+    :return: updated gpr
+    '''
+
+    existing_gpr = dict_reaction_gprs[reaction_id]
+
+    add_gpr_str = cobra.core.gene.GPR.to_string(add_gpr)
+    existing_gpr_str = cobra.core.gene.GPR.to_string(existing_gpr)
+
+    if (add_gpr_str not in existing_gpr_str) and (add_gpr_str != '') and (existing_gpr_str != ''):
+        return cobra.core.gene.GPR.from_string(existing_gpr_str + ' or ' + add_gpr_str)
+
+    elif (add_gpr_str not in existing_gpr_str) and (add_gpr_str != ''):
+        return add_gpr
+
+    else:
+        return existing_gpr
+
+
+def update_annotation(object_id, merging_object, dict_annot):
+    '''
+    Merges annotations when merging reactions and metabolites
+    :param object_id: reaction or metabolite id
+    :param merging_object: reaction or metabolite object
+    :param dict_annot: dictionary of annotations
+    '''
+    obj_annot = dict_annot[object_id]
+    merging_annot = merging_object.annotation
+
+    for annot, new_annotation in merging_annot.items():
+        if annot in obj_annot:
+            existing_annotation = obj_annot[annot]
+            if type(new_annotation) == str:
+                if (type(existing_annotation) == str) and (existing_annotation != new_annotation):
+                    existing_annotation = [new_annotation, existing_annotation]
+
+                elif (type(existing_annotation) == list) and (new_annotation not in existing_annotation):
+                    existing_annotation += [new_annotation]
+
+            elif type(new_annotation) == list:
+                if type(existing_annotation) == str:
+                    existing_annotation = [existing_annotation]
+
+                existing_annotation += [annotation for annotation in new_annotation
+                                        if annotation not in existing_annotation]
+        else:
+            obj_annot[annot] = new_annotation
+

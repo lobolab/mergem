@@ -64,6 +64,9 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
     merged_model_name += model.name if model.name else model.id
     model_objectives = []
 
+    dict_reaction_gprs = {}
+    dict_met_annot, dict_reac_annot = {}, {}
+
     for metabolite in model.metabolites:
         merged_model_metabolites.append(metabolite)
         old_met_id = metabolite.id
@@ -71,8 +74,10 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
 
         if (new_met_id is None) or (new_met_id in met_sources_dict):
             met_sources_dict[old_met_id] = {0}
+            dict_met_annot[old_met_id] = metabolite.annotation  # add annotation
         else:
             met_sources_dict[new_met_id] = {0}
+            dict_met_annot[new_met_id] = metabolite.annotation  # add annotation
             if new_met_id in met_model_id_dict:
                 met_model_id_dict[new_met_id].append(old_met_id)
             else:
@@ -90,6 +95,8 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
             if not reaction_key in merged_model_reactions_dict:
                 merged_model_reactions_dict[reaction_key] = reac_id
 
+            dict_reaction_gprs[reac_id] = reaction.gpr
+            dict_reac_annot[reac_id] = reaction.annotation  # add annotation
     objective_reactions.append(model_objectives)
 
     # Merge rest of models
@@ -107,22 +114,31 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
             if new_met_id is None:
                 if old_met_id in met_sources_dict:
                     met_sources_dict[old_met_id].add(model_index)
+                    __modelHandling.update_annotation(old_met_id, metabolite, dict_met_annot)  # update annotation
                 else:
                     met_sources_dict[old_met_id] = {model_index}
                     merged_model_metabolites.append(metabolite)
+                    dict_met_annot[old_met_id] = metabolite.annotation  # add annotation
+
             elif old_met_id in met_sources_dict:  # priority is given to original metabolite ids
                 met_sources_dict[old_met_id].add(model_index)
+                __modelHandling.update_annotation(old_met_id, metabolite, dict_met_annot)  # update annotation
+
             elif new_met_id in met_sources_dict:  # new metabolite id previously found
                 old_met_ids = met_model_id_dict[new_met_id]
                 if (old_met_id not in old_met_ids) and any(id in old_met_ids for id in model_metabolite_ids):  # model has a better match
                     met_sources_dict[old_met_id] = {model_index}
                     merged_model_metabolites.append(metabolite)
+                    dict_met_annot[old_met_id] = metabolite.annotation  # add annotation
+
                 elif model_index in met_sources_dict[new_met_id]:  # model already had a metabolite for this mergem id
                     for reaction in metabolite.reactions:  # replace id in its reactions
                         if new_met_id in [met.id for met in reaction.metabolites]: # new metabolite id conflict, keep it
                             if old_met_id not in met_sources_dict:  # first reaction with conflict
                                 met_sources_dict[old_met_id] = {model_index}
                                 merged_model_metabolites.append(metabolite)
+                                dict_met_annot[old_met_id] = metabolite.annotation  # add annotation
+
                         else:  # substitute metabolite in reaction
                             st_coeff = reaction.metabolites[metabolite]
                             reaction.add_metabolites({old_met_id: -st_coeff})
@@ -130,10 +146,12 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
                 else:
                     metabolite.id = new_met_id
                     met_sources_dict[new_met_id].add(model_index)
+                    __modelHandling.update_annotation(new_met_id, metabolite, dict_met_annot)  # update annotation
             else:
                 metabolite.id = new_met_id
                 met_sources_dict[new_met_id] = {model_index}
                 merged_model_metabolites.append(metabolite)
+                dict_met_annot[new_met_id] = metabolite.annotation  # add annotation
                 if new_met_id in met_model_id_dict:
                     met_model_id_dict[new_met_id].append(old_met_id)
                 else:
@@ -148,13 +166,28 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
                 if reaction_key in merged_model_reactions_dict:
                     existing_reac_id = merged_model_reactions_dict[reaction_key]
                     reac_sources_dict[existing_reac_id].add(model_index)
+                    __modelHandling.update_annotation(existing_reac_id, reaction, dict_reac_annot)
+                    dict_reaction_gprs[existing_reac_id] = __modelHandling.update_gpr(existing_reac_id,
+                                                                                      dict_reaction_gprs, reaction.gpr)
                     if reac_id in reac_sources_dict:
                         reac_sources_dict[reac_id].add(model_index)
+                        __modelHandling.update_annotation(reac_id, reaction, dict_reac_annot)  # update annotation
+                        dict_reaction_gprs[reac_id] = __modelHandling.update_gpr(reac_id, dict_reaction_gprs,
+                                                                                 reaction.gpr)
+
                 elif rev_reaction_key in merged_model_reactions_dict:
                     rev_existing_reac_id = merged_model_reactions_dict[rev_reaction_key]
                     reac_sources_dict[rev_existing_reac_id].add(model_index)
+                    __modelHandling.update_annotation(rev_existing_reac_id, reaction,
+                                                      dict_reac_annot)  # update annotation
+                    dict_reaction_gprs[rev_existing_reac_id] = __modelHandling.update_gpr(rev_existing_reac_id,
+                                                                                          dict_reaction_gprs,
+                                                                                          reaction.gpr)
                     if reac_id in reac_sources_dict:
                         reac_sources_dict[reac_id].add(model_index)
+                        __modelHandling.update_annotation(reac_id, reaction, dict_reac_annot)  # update annotation
+                        dict_reaction_gprs[reac_id] = __modelHandling.update_gpr(reac_id, dict_reaction_gprs,
+                                                                                 reaction.gpr)
                 else:
                     if reac_id in reac_sources_dict:
                         reac_id += '~'
@@ -165,12 +198,18 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
                     merged_model_reactions.append(reaction)
                     merged_model_reactions_dict[reaction_key] = reac_id
                     reac_sources_dict[reac_id] = {model_index}
+                    dict_reaction_gprs[reac_id] = reaction.gpr
+                    dict_reac_annot[reac_id] = reaction.annotation  # add annotation
 
         objective_reactions.append(model_objectives)
 
     if exact_sto:
         merged_model_id += '_exactsto'
         merged_model_name += ' with exact stoichiometry'
+
+    if not ignore_protonation:
+        merged_model_id += '_protonation'
+        merged_model_name += ' with protonation'
 
     merged_model_name += ' (mergem v' + __version._version + ')'
 
@@ -190,6 +229,20 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
 
     merged_model, reac_sources_dict = set_objective_expression(merged_model, reac_sources_dict, models,
                                                               objective_reactions, set_objective)
+
+    # update annotations and gpr in merged model
+    for reac_id, reac_gpr in dict_reaction_gprs.items():
+        merged_model.reactions.get_by_id(reac_id).gpr = reac_gpr
+
+    for reac_id, annotation in dict_reac_annot.items():
+        merged_model.reactions.get_by_id(reac_id).annotation = annotation
+
+    for met_id, annotation in dict_met_annot.items():
+        merged_model.metabolites.get_by_id(met_id).annotation = annotation
+        merged_model.metabolites.get_by_id(met_id).annotation['sbo'] = 'SBO:0000247'
+
+    for gene in merged_model.genes:
+        gene.annotation['sbo'] = 'SBO:0000243'
 
     merged_model.repair()
 
