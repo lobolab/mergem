@@ -33,6 +33,8 @@ Printing help text displays all the options.
     -up        Update ID mapping table
     -s         Save ID mapping table as CSV
     -e         Uses exact stoichiometry when merging reactions
+    -p         Consider protonation when merging reactions
+    -a         Extend annotations with mergem database of metabolites and reactions
     -t         Translate metabolite and reaction IDs to a target namespace (chebi, metacyc, kegg, reactome, metanetx, hmdb, biocyc, bigg, seed, sabiork, or rhea)
     --version  Show the version and exit.
     --help     Show this message and exit.
@@ -58,7 +60,7 @@ To print merge statistics, append the :code:`-v` argument:
 
 ::
 
-    mergem model1.xml model2.xml -obj 1 -v
+    mergem model1.xml model2.xml -v
 
 
 Output model filename can be provided using the :code:`-o` argument followed by desired output filename with file format
@@ -66,24 +68,38 @@ specified in the extension (.xml, ...):
 
 ::
 
-    mergem model.xml model2.xml -obj 1 -o mergedmodel.xml
+    mergem model.xml model2.xml -o mergedmodel.xml
 
 
 Save the ID mapping table as a CSV file by using the :code:`-s` argument:
 
 ::
 
-    mergem model1.xml model2.xml -obj 1 -s
+    mergem model1.xml model2.xml -s
 
 
 By default, reactions are merged when they have both a similar set of reactants and a similar set of products, without comparing their stoichiometry. To merge reactions only when they have the same exact stoichiometry in their reactants and products, use the :code:`-e` argument:
 
 ::
 
-    mergem model1.xml model2.xml -obj 1 -e
+    mergem model1.xml model2.xml -e
 
 
-Translate the ID of a metabolite from that used in a database (kegg, metanetx, modelseed, bigg, chebi) to that of another using the :code:`-t` argument:
+By default, reactions are compared ignoring the hydrogen and proton metabolites. To consider also the hydrogen and proton metabolites when comparing reactions, use the :code:`-p` argument:
+
+::
+
+    mergem model1.xml model2.xml -p
+
+
+Metabolite and reaction annotations are merged from all input models. In addition, mergem can extend these annotations using the mergem database. For extending the annotations using mergem dabase, use the :code:`-a` argument:
+
+::
+
+    mergem model1.xml model2.xml -a
+
+
+Mergem can translate the metabolite and reaction IDs to another database system when using the :code:`-t` argument:
 
 ::
 

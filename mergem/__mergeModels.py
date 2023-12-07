@@ -10,11 +10,10 @@ from . import __modelHandling
 from . import __version
 import cobra
 
-# merges models in a list to the template/first model
-# set_objective can be an integer for model obj or 'merge'
+# translate all metabolite and reaction IDs to a target namespace
 def translate(input_model, trans_to_db=None):
     """
-    Translates metabolite and reaction IDs to a target namespace (kegg, metanetx, modelseed, bigg, chebi)
+    Translates metabolite and reaction IDs to a target namespace
     :param input_model: a cobra model or file name
     :param trans_to_db: target database to be translated to
     :return: model with translated metabolite IDs.
@@ -24,16 +23,15 @@ def translate(input_model, trans_to_db=None):
 
 # merges models in a list to the template/first model
 # set_objective can be an integer for model obj or 'merge'
-def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None, ignore_protonation=True,
-          use_mergem_annot=False):
+def merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, extend_annot=False, trans_to_db=None):
     """
     Takes a list of cobra models or file names as input and merges them into a single model with the chosen objective. \n
     :param input_models: list of cobr+a models or file names
     :param set_objective: objective reaction from one of the models or merge (default) all model objectives
     :param exact_sto: Boolean which determines whether exact stoichiometry of metabolites is used during merging
+    :param use_prot: Boolean to consider hydrogen and proton when merging reactions
+    :param add_annot: Boolean to add additional metabolite and reaction annotations from mergem dictionaries
     :param trans_to_db: target database to be translated to
-    :param ignore_protonation: boolean to ignore hydrogen and proton during reaction merging
-    :param use_mergem_annot: add additional annotation from mergem dictionaries
     :return: a dictionary of the merged model, met & reac jaccard distances, num of mets and reacs merged,
             and met & reac sources.
     """
@@ -66,8 +64,7 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
     merged_model_name += model.name if model.name else model.id
     model_objectives = []
 
-    dict_reaction_gprs = {}
-    dict_met_annot, dict_reac_annot = {}, {}
+    dict_met_annot, dict_reac_annot, dict_gprs = {}, {}, {}
 
     for metabolite in model.metabolites:
         merged_model_metabolites.append(metabolite)
@@ -76,10 +73,10 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
 
         if (new_met_id is None) or (new_met_id in met_sources_dict):
             met_sources_dict[old_met_id] = {0}
-            dict_met_annot[old_met_id] = __modelHandling.add_annotation(old_met_id, metabolite, use_mergem_annot, True)
+            dict_met_annot[old_met_id] = metabolite.annotation
         else:
             met_sources_dict[new_met_id] = {0}
-            dict_met_annot[new_met_id] = __modelHandling.add_annotation(new_met_id, metabolite, use_mergem_annot, True)
+            dict_met_annot[new_met_id] = metabolite.annotation
             if new_met_id in met_model_id_dict:
                 met_model_id_dict[new_met_id].append(old_met_id)
             else:
@@ -93,11 +90,12 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
         else:
             merged_model_reactions.append(reaction)
             reac_sources_dict[reac_id] = {0}
-            reaction_key, rev_reaction_key = create_reaction_key(reaction, exact_sto, ignore_protonation)
+            reaction_key, rev_reaction_key = create_reaction_key(reaction, exact_sto, use_prot)
             if not reaction_key in merged_model_reactions_dict:
                 merged_model_reactions_dict[reaction_key] = reac_id
-            dict_reaction_gprs[reac_id] = reaction.gpr
-            dict_reac_annot[reac_id] = __modelHandling.add_annotation(reac_id, reaction, use_mergem_annot, False)
+
+            dict_reac_annot[reac_id] = reaction.annotation
+            dict_gprs[reac_id] = reaction.gpr
     objective_reactions.append(model_objectives)
 
     # Merge rest of models
@@ -115,22 +113,22 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
             if new_met_id is None:
                 if old_met_id in met_sources_dict:
                     met_sources_dict[old_met_id].add(model_index)
-                    __modelHandling.update_annotation(old_met_id, metabolite, dict_met_annot)  # update annotation
+                    __modelHandling.add_annotations(old_met_id, dict_met_annot, metabolite)
                 else:
                     met_sources_dict[old_met_id] = {model_index}
                     merged_model_metabolites.append(metabolite)
-                    dict_met_annot[old_met_id] = __modelHandling.add_annotation(old_met_id, metabolite, use_mergem_annot, True)
+                    dict_met_annot[old_met_id] = metabolite.annotation
 
             elif old_met_id in met_sources_dict:  # priority is given to original metabolite ids
                 met_sources_dict[old_met_id].add(model_index)
-                __modelHandling.update_annotation(old_met_id, metabolite, dict_met_annot)  # update annotation
+                __modelHandling.add_annotations(old_met_id, dict_met_annot, metabolite)
 
             elif new_met_id in met_sources_dict:  # new metabolite id previously found
                 old_met_ids = met_model_id_dict[new_met_id]
                 if (old_met_id not in old_met_ids) and any(id in old_met_ids for id in model_metabolite_ids):  # model has a better match
                     met_sources_dict[old_met_id] = {model_index}
                     merged_model_metabolites.append(metabolite)
-                    dict_met_annot[old_met_id] = __modelHandling.add_annotation(old_met_id, metabolite, use_mergem_annot, True)
+                    dict_met_annot[old_met_id] = metabolite.annotation
 
                 elif model_index in met_sources_dict[new_met_id]:  # model already had a metabolite for this mergem id
                     for reaction in metabolite.reactions:  # replace id in its reactions
@@ -138,7 +136,8 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
                             if old_met_id not in met_sources_dict:  # first reaction with conflict
                                 met_sources_dict[old_met_id] = {model_index}
                                 merged_model_metabolites.append(metabolite)
-                                dict_met_annot[old_met_id] = __modelHandling.add_annotation(old_met_id, metabolite, use_mergem_annot, True)
+                                dict_met_annot[old_met_id] = metabolite.annotation
+
                         else:  # substitute metabolite in reaction
                             st_coeff = reaction.metabolites[metabolite]
                             reaction.add_metabolites({old_met_id: -st_coeff})
@@ -146,12 +145,12 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
                 else:
                     metabolite.id = new_met_id
                     met_sources_dict[new_met_id].add(model_index)
-                    __modelHandling.update_annotation(new_met_id, metabolite, dict_met_annot)  # update annotation
+                    __modelHandling.add_annotations(new_met_id, dict_met_annot, metabolite)
             else:
                 metabolite.id = new_met_id
                 met_sources_dict[new_met_id] = {model_index}
                 merged_model_metabolites.append(metabolite)
-                dict_met_annot[new_met_id] = __modelHandling.add_annotation(new_met_id, metabolite, use_mergem_annot, True)
+                dict_met_annot[new_met_id] = metabolite.annotation
                 if new_met_id in met_model_id_dict:
                     met_model_id_dict[new_met_id].append(old_met_id)
                 else:
@@ -162,32 +161,26 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
             if reac_id in str(model.objective):  # processing objective reactions
                 model_objectives.append(reaction)
             else:
-                reaction_key, rev_reaction_key = create_reaction_key(reaction, exact_sto, ignore_protonation)
+                reaction_key, rev_reaction_key = create_reaction_key(reaction, exact_sto, use_prot)
                 if reaction_key in merged_model_reactions_dict:
                     existing_reac_id = merged_model_reactions_dict[reaction_key]
                     reac_sources_dict[existing_reac_id].add(model_index)
-                    __modelHandling.update_annotation(existing_reac_id, reaction, dict_reac_annot)
-                    dict_reaction_gprs[existing_reac_id] = __modelHandling.update_gpr(existing_reac_id,
-                                                                                      dict_reaction_gprs, reaction.gpr)
+                    __modelHandling.add_annotations(existing_reac_id, dict_reac_annot, reaction)
+                    __modelHandling.add_gpr(existing_reac_id, dict_gprs, reaction)
                     if reac_id in reac_sources_dict:
                         reac_sources_dict[reac_id].add(model_index)
-                        __modelHandling.update_annotation(reac_id, reaction, dict_reac_annot)  # update annotation
-                        dict_reaction_gprs[reac_id] = __modelHandling.update_gpr(reac_id, dict_reaction_gprs,
-                                                                                 reaction.gpr)
+                        __modelHandling.add_annotations(reac_id, dict_reac_annot, reaction)
+                        __modelHandling.add_gpr(reac_id, dict_gprs, reaction)
 
                 elif rev_reaction_key in merged_model_reactions_dict:
                     rev_existing_reac_id = merged_model_reactions_dict[rev_reaction_key]
                     reac_sources_dict[rev_existing_reac_id].add(model_index)
-                    __modelHandling.update_annotation(rev_existing_reac_id, reaction,
-                                                      dict_reac_annot)  # update annotation
-                    dict_reaction_gprs[rev_existing_reac_id] = __modelHandling.update_gpr(rev_existing_reac_id,
-                                                                                          dict_reaction_gprs,
-                                                                                          reaction.gpr)
+                    __modelHandling.add_annotations(rev_existing_reac_id, dict_reac_annot, reaction)
+                    __modelHandling.add_gpr(rev_existing_reac_id, dict_gprs, reaction)
                     if reac_id in reac_sources_dict:
                         reac_sources_dict[reac_id].add(model_index)
-                        __modelHandling.update_annotation(reac_id, reaction, dict_reac_annot)  # update annotation
-                        dict_reaction_gprs[reac_id] = __modelHandling.update_gpr(reac_id, dict_reaction_gprs,
-                                                                                 reaction.gpr)
+                        __modelHandling.add_annotations(reac_id, dict_reac_annot, reaction)
+                        __modelHandling.add_gpr(reac_id, dict_gprs, reaction)
                 else:
                     if reac_id in reac_sources_dict:
                         reac_id += '~'
@@ -198,8 +191,8 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
                     merged_model_reactions.append(reaction)
                     merged_model_reactions_dict[reaction_key] = reac_id
                     reac_sources_dict[reac_id] = {model_index}
-                    dict_reaction_gprs[reac_id] = reaction.gpr
-                    dict_reac_annot[reac_id] = __modelHandling.add_annotation(reac_id, reaction, use_mergem_annot, False)
+                    dict_reac_annot[reac_id] = reaction.annotation
+                    dict_gprs[reac_id] = reaction.gpr
 
         objective_reactions.append(model_objectives)
 
@@ -207,9 +200,13 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
         merged_model_id += '_exactsto'
         merged_model_name += ' with exact stoichiometry'
 
-    if not ignore_protonation:
-        merged_model_id += '_protonation'
+    if use_prot:
+        merged_model_id += '_useprot'
         merged_model_name += ' with protonation'
+
+    if trans_to_db:
+        merged_model_id += '_trans_' + trans_to_db
+        merged_model_name += ' translated to ' + trans_to_db
 
     merged_model_name += ' (mergem v' + __version._version + ')'
 
@@ -230,42 +227,39 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
     merged_model, reac_sources_dict = set_objective_expression(merged_model, reac_sources_dict, models,
                                                               objective_reactions, set_objective)
 
-    # update annotations and gpr in merged model
-    for reac_id, reac_gpr in dict_reaction_gprs.items():
-        merged_model.reactions.get_by_id(reac_id).gpr = reac_gpr
-
-    for reac_id, annotation in dict_reac_annot.items():
-        merged_model.reactions.get_by_id(reac_id).annotation = annotation
-
-    for met_id, annotation in dict_met_annot.items():
-        merged_model.metabolites.get_by_id(met_id).annotation = annotation
-        merged_model.metabolites.get_by_id(met_id).annotation['sbo'] = 'SBO:0000247'
-
-    for gene in merged_model.genes:
-        gene.annotation['sbo'] = 'SBO:0000243'
-
     merged_model.repair()
 
-    # Revert mergem ids and convert sources to lists
+    # Convert sources to lists
     met_sources_dict = {met_model_id_dict.get(met_id, [met_id])[0]: list(sources) for (met_id, sources) in met_sources_dict.items()}
     reac_sources_dict = {reac_id : list(sources) for (reac_id, sources) in reac_sources_dict.items()}
+    
     if trans_to_db:
         trans_to_db += ':'
 
+    # Post-processing metabolites
     for metabolite in merged_model.metabolites:
-        if trans_to_db:
+        metabolite.annotation = dict_met_annot.get(metabolite.id, {})
+        old_met_id = None
+        if trans_to_db or extend_annot:
             met_id_array = metabolite.id.split("_")
-            if met_id_array[0] == "mergem":
-                met_id = int(met_id_array[1] if len(met_id_array) > 1 else metabolite.id)
-                met_props = __modelHandling.get_metabolite_properties(met_id)
-                met_ids = met_props['ids']
-                old_met_id = next(((s[len(trans_to_db):] + '_' + met_id_array[2]) for s in met_ids if s.startswith(trans_to_db)),
-                                  met_model_id_dict.get(metabolite.id, [metabolite.id])[0])
-            else:
-                old_met_id = met_model_id_dict.get(metabolite.id, [metabolite.id])[0]
-        else:
-            old_met_id = met_model_id_dict.get(metabolite.id, [metabolite.id])[0]
+            met_univ_id = int(met_id_array[1]) if met_id_array[0] == "mergem" else __modelHandling.map_metabolite_univ_id(metabolite.id)
 
+            if met_univ_id:
+                met_props = __modelHandling.get_metabolite_properties(met_univ_id)
+
+                if extend_annot:
+                    __modelHandling.extend_metabolite_annotations(metabolite, met_props)
+
+                if trans_to_db:
+                    trans_met_id = next(
+                        ((s[len(trans_to_db):] + (('_' + met_id_array[-1]) if len(met_id_array) > 1 else '')) for s in met_props['ids'] if s.startswith(trans_to_db)), 
+                        None)
+                    if trans_met_id:
+                        met_sources_dict[trans_met_id] = met_sources_dict[met_model_id_dict.get(metabolite.id, [metabolite.id])[0]]
+                        old_met_id = trans_met_id
+        
+        if not old_met_id:
+            old_met_id = met_model_id_dict.get(metabolite.id, [metabolite.id])[0]
 
         if old_met_id != metabolite.id:
             if old_met_id in merged_model.metabolites:
@@ -279,35 +273,40 @@ def merge(input_models, set_objective='merge', exact_sto=False, trans_to_db=None
                 old_met_id = alt_old_met_id
             metabolite.id = old_met_id
 
-    # Translate reaction IDs
-    if trans_to_db:
-        for reaction in merged_model.reactions:
-            reac_mergem_id = __modelHandling.map_reaction_univ_id(reaction.id)
-            # safeguard if original database was translated
-            if (not reac_mergem_id) and ('_' in reaction.id):
-                reac_mergem_id = __modelHandling.map_reaction_univ_id('_'.join(reaction.id.split('_')[:-1]))
+    # Post-processing reactions
+    for reaction in merged_model.reactions:
+        reaction.annotation = dict_reac_annot.get(reaction.id, {})
+        if reaction.id in dict_gprs: reaction.gpr = dict_gprs[reaction.id]
 
-            if reac_mergem_id:
-                reac_ids = __modelHandling.get_reaction_properties(reac_mergem_id)['ids']
+        if trans_to_db or extend_annot:
+            if reac_mergem_id := __modelHandling.map_reaction_univ_id(reaction.id):
+                reac_props = __modelHandling.get_reaction_properties(reac_mergem_id)
 
-                new_reac_id = next(
-                    ((s[len(trans_to_db):]) for s in reac_ids if s.startswith(trans_to_db)),
-                    None)
+                if extend_annot:
+                    __modelHandling.extend_reaction_annotations(reaction, reac_props)
 
-                if new_reac_id:
-                    if new_reac_id in merged_model.reactions:
-                        i = 2
-                        while new_reac_id + '_' + str(i) in merged_model.reactions:
-                            i = i + 1
+                if trans_to_db:
+                    new_reac_id = next(
+                        ((s[len(trans_to_db):]) for s in reac_props['ids'] if s.startswith(trans_to_db)),
+                        None)
 
-                        new_reac_id = new_reac_id + '_' + str(i)
+                    if new_reac_id:
+                        while new_reac_id in merged_model.reactions:
+                            new_reac_id += '~'
 
-                    reaction.id = new_reac_id
+                        reac_sources_dict[new_reac_id] = reac_sources_dict[reaction.id]
+                        reaction.id = new_reac_id
 
-
-
+    # Post-processing genes
+    if extend_annot:
+        for gene in merged_model.genes:
+            gene.annotation['sbo'] = 'SBO:0000243'
 
     merged_model.repair()
+    
+    # Clean source dicts
+    met_sources_dict = {m.id: met_sources_dict[m.id] for m in merged_model.metabolites}
+    reac_sources_dict = {r.id: reac_sources_dict[r.id] for r in merged_model.reactions}
 
     result = {}
     result['merged_model'] = merged_model
@@ -341,24 +340,21 @@ def map_metabolite_to_mergem_id(metabolite):
 
         if (met_univ_id is None) and ('mergem' not in met_id):  # no mapping for metabolite ID
             for annot in metabolite.annotation:
-                if annot == 'sbo':
-                    continue
-                met_id_from_annot = metabolite.annotation[annot]  # get xref from annotation
-                if type(met_id_from_annot) == str:
-                    met_univ_id = __modelHandling.met_univ_id_dict.get(met_id_from_annot)
+                if annot != 'sbo':
+                    met_id_from_annot = metabolite.annotation[annot]  # get xref from annotation
+                    if type(met_id_from_annot) == str:
+                        met_univ_id = __modelHandling.met_univ_id_dict.get(met_id_from_annot)
+                    elif type(met_id_from_annot) == list:
+                        for annot_met_id in met_id_from_annot:
+                            if ':' in annot_met_id:
+                                split_annot_id = annot_met_id.split(':', 1)[1]
+                                met_univ_id = __modelHandling.met_univ_id_dict.get(split_annot_id)
+                            else:
+                                met_univ_id = __modelHandling.met_univ_id_dict.get(annot_met_id)
+                            if met_univ_id:
+                                break
                     if met_univ_id:
                         break
-                else:  # if list of annotations for a db
-                    for annot_met_id in met_id_from_annot:
-                        if ':' in annot_met_id:
-                            split_annot_id = annot_met_id.split(':', 1)[1]
-                            met_univ_id = __modelHandling.met_univ_id_dict.get(split_annot_id)
-                        else:
-                            met_univ_id = __modelHandling.met_univ_id_dict.get(annot_met_id)
-                        if met_univ_id:
-                            break
-                if met_univ_id:
-                    break
         if met_univ_id is None:
             return None
 
@@ -378,19 +374,19 @@ def map_metabolite_to_mergem_id(metabolite):
 
 
 # reaction key is a frozenset of tuples of participating mets with their stoichiometric coeffs
-def create_reaction_key(reaction, exact_sto, ignore_protonation):
+def create_reaction_key(reaction, exact_sto, use_prot):
     """
     Takes a reaction object as input and creates a key(frozen set) of all pairs of metabolite ID and stoichiometric
     coefficients. \n
     :param reaction: Cobra reaction object
     :param exact_sto: Reaction stoichiometric coefficient
-    :param ignore_protonation: Ignore hydrogen and protons
+    :param use_prot: Inclue hydrogen and protons
     :return: frozen set of pairs of IDs of participating metabolite and their stoichiometric coefficients
     """
     reac_metabolite_set = set()
     reac_rev_met_set = set()
     for reactant in reaction.reactants:
-        if ignore_protonation and (reactant.id.startswith(__modelHandling.proton_mergem_id) or reactant.name == "PMF"):
+        if (not use_prot) and (reactant.id.startswith(__modelHandling.proton_mergem_id) or reactant.name == "PMF"):
             continue
 
         elif reactant.id[-1] != 'b':
@@ -402,7 +398,7 @@ def create_reaction_key(reaction, exact_sto, ignore_protonation):
             reac_rev_met_set.add(rev_met_set)
 
     for product in reaction.products:
-        if ignore_protonation and (product.id.startswith(__modelHandling.proton_mergem_id) or product.name == "PMF"):
+        if (not use_prot) and (product.id.startswith(__modelHandling.proton_mergem_id) or product.name == "PMF"):
             continue
         elif product.id[-1] != 'b':
             id = product.id if product.id.startswith('mergem_') else map_metabolite_to_mergem_id(product)

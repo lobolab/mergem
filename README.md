@@ -35,6 +35,8 @@ Command-line options can be viewed using "--help" flag, as shown below:
     -up        Update ID mapping table
     -s         Save ID mapping table as CSV
     -e         Uses exact stoichiometry when merging reactions
+    -p         Consider protonation when merging reactions
+    -a         Extend annotations with mergem database of metabolites and reactions
     -t TEXT    Translate all metabolite and reaction IDs to a target namespace (chebi, metacyc, kegg, reactome, metanetx, hmdb, biocyc, bigg, seed, sabiork, or rhea)
     --version  Show the version and exit.
     --help     Show this message and exit.
