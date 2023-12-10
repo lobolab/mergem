@@ -9,6 +9,7 @@
 from . import __modelHandling
 from . import __version
 import cobra
+from collections import defaultdict
 
 # translate all metabolite and reaction IDs to a target namespace
 def translate(input_model, trans_to_db=None):
@@ -51,7 +52,9 @@ def merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, 
             models.append(input_model)
 
     objective_reactions = []
-    met_model_id_dict, met_sources_dict, reac_sources_dict, merged_model_reactions_dict = {}, {}, {}, {}
+    met_model_id_dict, met_sources_dict, merged_model_reactions_dict = {}, {}, {}
+    met_sources_dict = defaultdict(lambda:defaultdict(list))
+    reac_sources_dict = defaultdict(lambda:defaultdict(list))
 
     merged_model_id = 'mergem'
     merged_model_name = 'Mergem of '
@@ -72,10 +75,10 @@ def merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, 
         new_met_id = map_metabolite_to_mergem_id(metabolite)
 
         if (new_met_id is None) or (new_met_id in met_sources_dict):
-            met_sources_dict[old_met_id] = {0}
+            met_sources_dict[old_met_id][0].append(old_met_id)
             dict_met_annot[old_met_id] = metabolite.annotation
         else:
-            met_sources_dict[new_met_id] = {0}
+            met_sources_dict[new_met_id][0].append(old_met_id)
             dict_met_annot[new_met_id] = metabolite.annotation
             if new_met_id in met_model_id_dict:
                 met_model_id_dict[new_met_id].append(old_met_id)
@@ -89,7 +92,7 @@ def merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, 
             model_objectives.append(reaction)
         else:
             merged_model_reactions.append(reaction)
-            reac_sources_dict[reac_id] = {0}
+            reac_sources_dict[reac_id][0].append(reac_id)
             reaction_key, rev_reaction_key = create_reaction_key(reaction, exact_sto, use_prot)
             if not reaction_key in merged_model_reactions_dict:
                 merged_model_reactions_dict[reaction_key] = reac_id
@@ -112,21 +115,21 @@ def merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, 
 
             if new_met_id is None:
                 if old_met_id in met_sources_dict:
-                    met_sources_dict[old_met_id].add(model_index)
+                    met_sources_dict[old_met_id][model_index].append(old_met_id)
                     __modelHandling.add_annotations(old_met_id, dict_met_annot, metabolite)
                 else:
-                    met_sources_dict[old_met_id] = {model_index}
+                    met_sources_dict[old_met_id][model_index].append(old_met_id)
                     merged_model_metabolites.append(metabolite)
                     dict_met_annot[old_met_id] = metabolite.annotation
 
             elif old_met_id in met_sources_dict:  # priority is given to original metabolite ids
-                met_sources_dict[old_met_id].add(model_index)
+                met_sources_dict[old_met_id][model_index].append(old_met_id)
                 __modelHandling.add_annotations(old_met_id, dict_met_annot, metabolite)
 
             elif new_met_id in met_sources_dict:  # new metabolite id previously found
                 old_met_ids = met_model_id_dict[new_met_id]
                 if (old_met_id not in old_met_ids) and any(id in old_met_ids for id in model_metabolite_ids):  # model has a better match
-                    met_sources_dict[old_met_id] = {model_index}
+                    met_sources_dict[old_met_id][model_index].append(old_met_id)
                     merged_model_metabolites.append(metabolite)
                     dict_met_annot[old_met_id] = metabolite.annotation
 
@@ -134,7 +137,7 @@ def merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, 
                     for reaction in metabolite.reactions:  # replace id in its reactions
                         if new_met_id in [met.id for met in reaction.metabolites]: # new metabolite id conflict, keep it
                             if old_met_id not in met_sources_dict:  # first reaction with conflict
-                                met_sources_dict[old_met_id] = {model_index}
+                                met_sources_dict[old_met_id][model_index].append(old_met_id)
                                 merged_model_metabolites.append(metabolite)
                                 dict_met_annot[old_met_id] = metabolite.annotation
 
@@ -143,12 +146,12 @@ def merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, 
                             reaction.add_metabolites({old_met_id: -st_coeff})
                             reaction.add_metabolites({new_met_id: st_coeff})
                 else:
+                    met_sources_dict[new_met_id][model_index].append(old_met_id)
                     metabolite.id = new_met_id
-                    met_sources_dict[new_met_id].add(model_index)
                     __modelHandling.add_annotations(new_met_id, dict_met_annot, metabolite)
             else:
                 metabolite.id = new_met_id
-                met_sources_dict[new_met_id] = {model_index}
+                met_sources_dict[new_met_id][model_index].append(old_met_id)
                 merged_model_metabolites.append(metabolite)
                 dict_met_annot[new_met_id] = metabolite.annotation
                 if new_met_id in met_model_id_dict:
@@ -164,24 +167,27 @@ def merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, 
                 reaction_key, rev_reaction_key = create_reaction_key(reaction, exact_sto, use_prot)
                 if reaction_key in merged_model_reactions_dict:
                     existing_reac_id = merged_model_reactions_dict[reaction_key]
-                    reac_sources_dict[existing_reac_id].add(model_index)
+                    reac_sources_dict[existing_reac_id][model_index].append(reac_id)
                     __modelHandling.add_annotations(existing_reac_id, dict_reac_annot, reaction)
                     __modelHandling.add_gpr(existing_reac_id, dict_gprs, reaction)
                     if reac_id in reac_sources_dict:
-                        reac_sources_dict[reac_id].add(model_index)
+                        if reac_id != existing_reac_id:
+                            reac_sources_dict[reac_id][model_index].append(reac_id)
                         __modelHandling.add_annotations(reac_id, dict_reac_annot, reaction)
                         __modelHandling.add_gpr(reac_id, dict_gprs, reaction)
 
                 elif rev_reaction_key in merged_model_reactions_dict:
                     rev_existing_reac_id = merged_model_reactions_dict[rev_reaction_key]
-                    reac_sources_dict[rev_existing_reac_id].add(model_index)
+                    reac_sources_dict[rev_existing_reac_id][model_index].append(reac_id)
                     __modelHandling.add_annotations(rev_existing_reac_id, dict_reac_annot, reaction)
                     __modelHandling.add_gpr(rev_existing_reac_id, dict_gprs, reaction)
                     if reac_id in reac_sources_dict:
-                        reac_sources_dict[reac_id].add(model_index)
+                        if reac_id != rev_existing_reac_id:
+                            reac_sources_dict[reac_id][model_index].append(reac_id)
                         __modelHandling.add_annotations(reac_id, dict_reac_annot, reaction)
                         __modelHandling.add_gpr(reac_id, dict_gprs, reaction)
                 else:
+                    orig_reac_id = reac_id
                     if reac_id in reac_sources_dict:
                         reac_id += '~'
                         while reac_id in reac_sources_dict:
@@ -190,7 +196,7 @@ def merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, 
 
                     merged_model_reactions.append(reaction)
                     merged_model_reactions_dict[reaction_key] = reac_id
-                    reac_sources_dict[reac_id] = {model_index}
+                    reac_sources_dict[reac_id][model_index].append(orig_reac_id)
                     dict_reac_annot[reac_id] = reaction.annotation
                     dict_gprs[reac_id] = reaction.gpr
 
@@ -229,9 +235,11 @@ def merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, 
 
     merged_model.repair()
 
-    # Convert sources to lists
-    met_sources_dict = {met_model_id_dict.get(met_id, [met_id])[0]: list(sources) for (met_id, sources) in met_sources_dict.items()}
-    reac_sources_dict = {reac_id : list(sources) for (reac_id, sources) in reac_sources_dict.items()}
+    # Convert IDs back to originals
+    met_sources_dict = {met_model_id_dict.get(met_id, [met_id])[0]: sources 
+                        for (met_id, sources) in met_sources_dict.items()}
+    reac_sources_dict = {reac_id: sources 
+                         for (reac_id, sources) in reac_sources_dict.items()}
     
     if trans_to_db:
         trans_to_db += ':'
@@ -305,18 +313,22 @@ def merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, 
     merged_model.repair()
     
     # Clean source dicts
-    met_sources_dict = {m.id: met_sources_dict[m.id] for m in merged_model.metabolites}
-    reac_sources_dict = {r.id: reac_sources_dict[r.id] for r in merged_model.reactions}
+    met_sources_dict = {m.id: {model_index:(ids if len(ids) > 1 else ids[0]) 
+                               for model_index,ids in met_sources_dict[m.id].items()} 
+                               for m in merged_model.metabolites}
+    reac_sources_dict = {r.id: {model_index:(ids if len(ids) > 1 else ids[0]) 
+                                for model_index,ids in reac_sources_dict[r.id].items()} 
+                                for r in merged_model.reactions}
 
-    result = {}
-    result['merged_model'] = merged_model
-    result['jacc_matrix'] = jacc_matrix
-    result['num_met_merged'] = num_mets_merged
-    result['num_reac_merged'] = num_reacs_merged
-    result['met_sources'] = met_sources_dict
-    result['reac_sources'] = reac_sources_dict
+    results = {}
+    results['merged_model'] = merged_model
+    results['jacc_matrix'] = jacc_matrix
+    results['num_met_merged'] = num_mets_merged
+    results['num_reac_merged'] = num_reacs_merged
+    results['met_sources'] = met_sources_dict
+    results['reac_sources'] = reac_sources_dict
 
-    return result
+    return results
 
 
 # returns a metabolite id in mergem namespace with cellular localization
@@ -427,13 +439,13 @@ def set_objective_expression(merged_model, reac_sources_dict, models, objective_
     if len(models) > 1 and set_objective == 'merge':
         merged_model, reac_sources_dict = create_merged_objective(merged_model, reac_sources_dict, objective_reactions)
     else:
-        model_num = int(1 if set_objective == 'merge' else set_objective) - 1
-        reactions = objective_reactions[model_num]
+        model_index = int(1 if set_objective == 'merge' else set_objective) - 1
+        reactions = objective_reactions[model_index]
         if len(reactions):
             merged_model.add_reactions(reactions)
-            merged_model.objective = models[model_num].objective.expression
+            merged_model.objective = models[model_index].objective.expression
             for reaction in reactions:
-                reac_sources_dict[reaction.id] = {model_num}
+                reac_sources_dict[reaction.id][model_index].append(reaction.id)
 
     return merged_model, reac_sources_dict
 
@@ -451,8 +463,9 @@ def create_merged_objective(merged_model, reac_sources_dict, objective_reactions
     st_dict = {}
     metabolite_dict = {}
 
-    for reaction_list in objective_reactions:
+    for model_index, reaction_list in enumerate(objective_reactions):
         for reaction in reaction_list:
+            reac_sources_dict[merged_obj_reaction_id][model_index].append(reaction.id)
             for metabolite in reaction.metabolites:
                 if metabolite.id not in st_dict:
                     st_dict[metabolite.id] = set()
@@ -471,8 +484,6 @@ def create_merged_objective(merged_model, reac_sources_dict, objective_reactions
 
         merged_model.add_reactions([merged_obj_reaction])
         merged_model.objective = merged_obj_reaction_id
-
-        reac_sources_dict[merged_obj_reaction_id] = list(range(0, len(objective_reactions)))
 
     return merged_model, reac_sources_dict
 

@@ -145,8 +145,8 @@ Provide the list of models to be merged:
 * :code:`jacc_matrix` metabolite and reaction jaccard distances.
 * :code:`num_met_merged` number of metabolites merged.
 * :code:`num_reac_merged` number of reactions merged.
-* :code:`met_sources` dictionary mapping each metabolite ID in the merged model to the input models that contained them
-* :code:`reac_sources` dictionary mapping each reaction ID in the merged model to the input models that contained them
+* :code:`met_sources` dictionary mapping each metabolite ID in the merged model to the corresponding metabolite IDs from each of the input models.
+* :code:`reac_sources` dictionary mapping each reaction ID in the merged model to the corresponding reaction IDs from each of the input models.
 
 
 Other mergem functions

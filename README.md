@@ -78,8 +78,8 @@ For merging or processing one, two, or more models, provide a list of models to 
 * `jacc_matrix` metabolite and reaction jaccard distances.
 * `num_met_merged` number of metabolites merged.
 * `num_reac_merged` number of reactions merged.
-* `met_sources` dictionary mapping each metabolite ID in the merged model to the input models that contained them
-* `reac_sources` dictionary mapping each reaction ID in the merged model to the input models that contained them
+* `met_sources` dictionary mapping each metabolite ID in the merged model to the corresponding metabolite IDs from each of the input models.
+* `reac_sources` dictionary mapping each reaction ID in the merged model to the corresponding reaction IDs from each of the input models.
 
 The merge function returns a dictionary of results including the merged model,
 the metabolite and reaction Jaccard distance matrix between models, and the 
