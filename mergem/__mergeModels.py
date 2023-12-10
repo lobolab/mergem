@@ -16,7 +16,7 @@ def translate(input_model, trans_to_db=None):
     Translates metabolite and reaction IDs to a target namespace
     :param input_model: a cobra model or file name
     :param trans_to_db: target database to be translated to
-    :return: model with translated metabolite IDs.
+    :return: model with translated metabolite and reaction IDs.
     """
     return merge([input_model], trans_to_db=trans_to_db)['merged_model']
 
