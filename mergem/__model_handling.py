@@ -6,6 +6,7 @@
     Copyright (c) Lobo Lab (https://lobolab.umbc.edu)
 """
 
+from .__database_processing import build_id_mapping
 import cobra
 # This hack solves the problem of cobrapy replacements introducing control ASCII characters in ids,
 # which breaks the glpk solver and crashes the Python kernel
@@ -18,7 +19,6 @@ cobra.io.sbml._number_to_chr = _number_to_chr_safe
 
 from pickle import dump, load
 import os
-from .__database_id_merger import build_id_mapping
 import csv
 
 met_univ_id_dict, met_univ_id_prop_dict, reac_univ_id_dict, reac_univ_id_prop_dict = {}, {}, {}, {}
