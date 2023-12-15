@@ -1,12 +1,13 @@
 *********************************
-Using mergem to merge models
+Using mergem to merge, compare, and translate models
 *********************************
-mergem can merge two or more genome-scale metabolic models. The command-line execution can take input models in
+mergem can merge, compare, and translate genome-scale metabolic models. The command-line execution can take input models in
 various COBRApy compatible formats (SBML, JSON, YAML, and MAT).
 mergem can be imported into a python script and the merge function can take cobra objects in addition to filenames.
 A single objective function from any of the input models can be set as the objective for merged model. Alternatively,
 objective functions from all input models can be merged into a single function and set as the objective in the merged
-model.
+model. The metabolite and reaction IDS of the merged or standalone models can be translated to any of the database
+systems supported in mergem.
 
 
 .. _cli:
@@ -14,7 +15,7 @@ model.
 Command-line
 ==========================
 Once mergem has been installed using pip, the following commands can be run on the command-line.
-Printing help text displays all the options.
+The help argument displays all the options.
 
 ::
 

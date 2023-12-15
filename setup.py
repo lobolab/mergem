@@ -7,10 +7,10 @@ exec(open("./mergem/__version.py").read())
 
 setup(name='mergem',
       version=_version,
-      description='Merge two or more genome scale metabolic models.',
+      description='mergem is a python package and command-line tool for merging, comparing, and translating genome-scale metabolic models.',
       long_description=long_description,
       long_description_content_type="text/markdown",
-      url='https://github.com/lobolab/mergem',
+      url='https://lobolab.umbc.edu/mergem/',
       author='Lobo Lab',
       author_email='lobolab@umbc.edu',
       maintainer='Archana Hari',

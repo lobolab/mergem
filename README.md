@@ -1,14 +1,13 @@
 mergem
 ======
-mergem is a python package for merging genome-scale metabolic models.
-The package can be used as a command-line tool or can be imported within a python script.
+mergem is a python package and command-line tool for merging, comparing, and translating genome-scale metabolic models.
 
 ------
 
 
 Installation
 ------
-To install the latest release  
+Use pip to install the latest release:
 
     pip install mergem
 
@@ -16,7 +15,7 @@ To install the latest release
 
 Usage
 ------
-For detailed usage instructions, please refer to the help [documentation](https://mergem.readthedocs.io/en/latest/).
+For detailed usage instructions, please refer to the [documentation](https://mergem.readthedocs.io/en/latest/).
 
 #### Command-line usage
 Command-line options can be viewed using "--help" flag, as shown below:
