@@ -305,6 +305,20 @@ def merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, 
 
                         reac_sources_dict[new_reac_id] = reac_sources_dict[reaction.id]
                         reaction.id = new_reac_id
+            elif trans_to_db: # Translate reactions with a metabolite id (e.g., exchange reactions)
+                reac_id_array = reaction.id.split('_')
+                met_univ_id = None if len(reac_id_array) < 2 else __model_handling.map_metabolite_univ_id('_'.join(reac_id_array[1:]))
+                if met_univ_id:
+                    met_props = __model_handling.get_metabolite_properties(met_univ_id)
+                    new_reac_id = next(
+                        ((reac_id_array[0] + '_' + s[len(trans_to_db):] + (('_' + reac_id_array[-1]) if len(reac_id_array) > 2 else '')) for s in met_props['ids'] if s.startswith(trans_to_db)), 
+                        None)
+                    if new_reac_id:
+                        while new_reac_id in merged_model.reactions:
+                            new_reac_id += '~'
+
+                        reac_sources_dict[new_reac_id] = reac_sources_dict[reaction.id]
+                        reaction.id = new_reac_id
 
     # Post-processing genes
     if extend_annot:
