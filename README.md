@@ -104,25 +104,15 @@ The following functions can also be imported from mergem:
 Citation
 ======
 Please cite mergem using: <br>
-<br> [mergem: merging and comparing genome-scale metabolic models using universal identifiers](https://doi.org/10.1101/2022.07.14.499633)
-<br> A. Hari, D. Lobo.
-<br> <b>bioRxiv</b>, doi:10.1101/2022.07.14.499633, 2022
-
-------
+<br> [mergem: merging, comparing, and translating genome-scale metabolic models using universal identifiers](https://doi.org/10.1093/nargab/lqae010)
+<br> A. Hari, A. Zarrabi, D. Lobo
+<br> <b>NAR Genomics and Bioinformatics</b>, 6(1), lqae010, 2024
 
 ------
 Acknowledgements 
 ======
 
-This package was developed at [The Lobo Lab](https://lobolab.umbc.edu), University of Maryland Baltimore County.
-
-------
-
-References
-======
-The following publications have contributed towards the development of this package:
-* [Fluxer: a web application to compute and visualize genome-scale metabolic flux networks](https://doi.org/10.1093/nar/gkaa409).
-* [COBRApy: COnstraints-Based Reconstruction and Analysis for Python](http://dx.doi.org/doi:10.1186/1752-0509-7-74).
+This package was developed at [The Lobo Lab](https://lobolab.umbc.edu), University of Maryland, Baltimore County.
 
 ------
 

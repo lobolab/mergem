@@ -35,6 +35,11 @@ def main(input_filenames, obj, o=None, v=False, up=False, s=False, e=False, p=Fa
     and saves the merged model as .xml. Users can optionally select the objective, provide
     an output filename for the merged model, and translate the models to a different namespace.
 
+    Citation:
+    mergem: merging, comparing, and translating genome-scale metabolic models using universal identifiers
+    A. Hari, A. Zarrabi, D. Lobo
+    NAR Genomics and Bioinformatics 6(1), lqae010, 2024
+
     Lobo Lab (https://lobolab.umbc.edu)
     """
     model_filenames = input_filenames
