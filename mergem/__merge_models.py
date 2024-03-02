@@ -66,6 +66,7 @@ def merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, 
     model = models[0]
     merged_model_id += '_' + model.id
     merged_model_name += model.name if model.name else model.id
+    merged_compartments = model.compartments
     model_objectives = []
 
     dict_met_annot, dict_reac_annot, dict_gprs = {}, {}, {}
@@ -107,6 +108,7 @@ def merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, 
         model = models[model_index]
         merged_model_id += '_' + model.id
         merged_model_name += '; ' + (model.name if model.name else model.id)
+        merged_compartments = model.compartments | merged_compartments
         model_objectives = []
         model_metabolite_ids = {m.id for m in model.metabolites}
 
@@ -220,6 +222,7 @@ def merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, 
     merged_model = cobra.Model(merged_model_id, merged_model_name)
     merged_model.add_metabolites(merged_model_metabolites)
     merged_model.add_reactions(merged_model_reactions)
+    merged_model.compartments = {(k,v) for k,v in merged_compartments.items() if k in merged_model.compartments}
 
     jacc_matrix = compute_jaccard_matrix(len(models), met_sources_dict, reac_sources_dict)
 
