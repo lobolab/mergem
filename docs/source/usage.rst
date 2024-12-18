@@ -29,7 +29,7 @@ The help argument displays all the options.
     Options:
     -obj TEXT  Set objective: 'merge' all objectives (default) or 1, 2, 3...
              (objective from one of the input models)
-    -o TEXT    Save model as (filename with format .xml, .sbml, etc.)
+    -o TEXT    Save merged model as (filename with format .xml, .sbml, etc.)
     -v         Print merging statistics
     -up        Update ID mapping table
     -s         Save ID mapping table as CSV
@@ -37,6 +37,7 @@ The help argument displays all the options.
     -p         Consider protonation when merging reactions
     -a         Extend annotations with mergem database of metabolites and reactions
     -t         Translate metabolite and reaction IDs to a target namespace (chebi, metacyc, kegg, reactome, metanetx, hmdb, biocyc, bigg, seed, sabiork, or rhea)
+    -c         output as a community model
     --version  Show the version and exit.
     --help     Show this message and exit.
 
@@ -93,7 +94,7 @@ By default, reactions are compared ignoring the hydrogen and proton metabolites.
     mergem model1.xml model2.xml -p
 
 
-Metabolite and reaction annotations are merged from all input models. In addition, mergem can extend these annotations using the mergem database. For extending the annotations using mergem dabase, use the :code:`-a` argument:
+Metabolite and reaction annotations are merged from all input models. In addition, mergem can extend these annotations using the mergem database. For extending the annotations using mergem database, use the :code:`-a` argument:
 
 ::
 
@@ -105,6 +106,15 @@ Mergem can translate the metabolite and reaction IDs to another database system 
 ::
 
     mergem model1.xml -t chebi
+
+
+Mergem can merge models into a community models using the :code:`-c` argument. In addition, the metabolites of a single
+model can be assigned compartments without merging:
+
+::
+
+    mergem model1.xml model2.xml -c
+
 
 
 .. _python-import:
@@ -126,7 +136,7 @@ Provide the list of models to be merged:
 
 ::
 
-    results = mergem.merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, extend_annot=False, trans_to_db=None)
+    results = mergem.merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, extend_annot=False, trans_to_db=None, community_model=False)
     merged_model = results['merged_model']
     jacc_matrix = results['jacc_matrix']
     num_met_merged = results['num_met_merged']
@@ -140,6 +150,7 @@ Provide the list of models to be merged:
 * :code:`use_prot` consider hydrogen and proton metabolites when merging reactions.
 * :code:`add_annot` add additional metabolite and reaction annotations from mergem dictionaries.
 * :code:`trans_to_db` translate metabolite and reaction IDs to a target database (chebi, metacyc, kegg, reactome, metanetx, hmdb, biocyc, bigg, seed, sabiork, or rhea)
+* :code:`community_model` consider community metabolites when merging
 
 * :code:`results` a dictionary with all the results, including:
 * :code:`merged_model` the merged model.

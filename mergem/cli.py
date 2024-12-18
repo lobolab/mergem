@@ -28,8 +28,9 @@ _allowed_file_formats = ["sbml", "xml", "mat", "m", "matlab", "json", "yaml"]
 @click.option('-p', help='Consider protonation when merging reactions', is_flag=True)
 @click.option('-a', help='Extend annotations with mergem database of metabolites and reactions', is_flag=True)
 @click.option('-t', help='Translate all metabolite and reaction IDs to a target namespace (chebi, metacyc, kegg, reactome, metanetx, hmdb, biocyc, bigg, seed, sabiork, rhea)')
+@click.option('-c', help='output as a community model', is_flag=True)
 @click.version_option(_version + "\nLobo Lab (https://lobolab.umbc.edu)")
-def main(input_filenames, obj, o=None, v=False, up=False, s=False, e=False, p=False, a=False, t=None):
+def main(input_filenames, obj, o=None, v=False, up=False, s=False, e=False, p=False, a=False, t=None, c=False):
     """
     mergem takes genome-scale metabolic models as input, merges them into a single model
     and saves the merged model as .xml. Users can optionally select the objective, provide
@@ -86,7 +87,7 @@ def main(input_filenames, obj, o=None, v=False, up=False, s=False, e=False, p=Fa
             sys.exit()
         input_list_of_models.append(input_model)
 
-    merge_results = mergem.merge(input_list_of_models, set_objective=objective, exact_sto=e, use_prot=p, extend_annot=a, trans_to_db=t)
+    merge_results = mergem.merge(input_list_of_models, set_objective=objective, exact_sto=e, use_prot=p, extend_annot=a, trans_to_db=t, community_model=c)
     result_merged_model = merge_results['merged_model']
 
     try:

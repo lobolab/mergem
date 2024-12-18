@@ -25,7 +25,7 @@ def translate(input_model, trans_to_db=None):
 
 # merges models in a list to the template/first model
 # set_objective can be an integer for model obj or 'merge'
-def merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, extend_annot=False, trans_to_db=None):
+def merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, extend_annot=False, trans_to_db=None, community_model=False):
     """
     Takes a list of cobra models or file names as input and merges them into a single model with the chosen objective. \n
     :param input_models: list of cobr+a models or file names
@@ -34,6 +34,7 @@ def merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, 
     :param use_prot: Boolean to consider hydrogen and proton when merging reactions
     :param add_annot: Boolean to add additional metabolite and reaction annotations from mergem dictionaries
     :param trans_to_db: target database to be translated to
+    :param community_model: Boolean to consider community metabolites when merging
     :return: a dictionary of the merged model, met & reac jaccard distances, num of mets and reacs merged,
             and met & reac sources.
     """
@@ -62,14 +63,20 @@ def merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, 
     merged_model_metabolites = []
     merged_model_reactions = []
 
+    if community_model:
+        compartmentalize(models)
+
     # Add first model
     model = models[0]
     merged_model_id += '_' + model.id
     merged_model_name += model.name if model.name else model.id
-    merged_compartments = model.compartments
     model_objectives = []
 
     dict_met_annot, dict_reac_annot, dict_gprs = {}, {}, {}
+
+
+
+    merged_compartments = model.compartments
 
     for metabolite in model.metabolites:
         merged_model_metabolites.append(metabolite)
@@ -108,6 +115,7 @@ def merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, 
         model = models[model_index]
         merged_model_id += '_' + model.id
         merged_model_name += '; ' + (model.name if model.name else model.id)
+
         merged_compartments = model.compartments | merged_compartments
         model_objectives = []
         model_metabolite_ids = {m.id for m in model.metabolites}
@@ -332,7 +340,7 @@ def merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, 
     
     # Clean source dicts
     met_sources_dict = {m.id: {model_index:(ids if len(ids) > 1 else ids[0]) 
-                               for model_index,ids in met_sources_dict[m.id].items()} 
+                               for model_index,ids in met_sources_dict[m.id].items()}
                                for m in merged_model.metabolites}
     reac_sources_dict = {r.id: {model_index:(ids if len(ids) > 1 else ids[0]) 
                                 for model_index,ids in reac_sources_dict[r.id].items()} 
@@ -349,6 +357,139 @@ def merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, 
     return results
 
 
+def split_metabolite_id(metabolite_id):
+
+    met_id, loc, comp = None, None, None
+
+    if '@' in metabolite_id:
+        separated_id = metabolite_id.split('@')
+    else:
+        separated_id = metabolite_id.split('_')
+
+    mnxc_metabolites = find_mnxc(separated_id)
+    if mnxc_metabolites is not None:
+        separated_id = mnxc_metabolites
+
+    separated_id = find_bracket(separated_id)
+
+    if len(separated_id) == 1:
+        met_id = separated_id[0]
+    else:
+        if len(separated_id) > 2 and separated_id[-1].isdigit():
+            loc = separated_id[-2]
+            comp = separated_id[-1]
+            met_id = "_".join(separated_id[:-2])
+        else:
+            final_element = separated_id[-1]
+            for char in reversed(final_element):
+                if char.isalpha():
+                    loc = final_element if comp is None else final_element[:-len(comp)]
+                    break
+                elif char.isdigit():
+                    comp = char if comp is None else char + comp
+            met_id = "_".join(separated_id[:-1])
+
+        loc = __model_handling.map_localization(loc)
+        if loc == "":
+            met_id = "_".join(separated_id)
+            comp = None
+        elif comp is not None:
+            comp = int(comp)
+
+    return met_id, loc, comp
+
+
+def find_mnxc(metabolite_id_components):
+    mnxc_dic = {'0': 'u', #cellular component
+                '1': 's', #cell
+                '2': 'e', #extracellular region
+                '3': 'c', #cytoplasm
+                '4': 'm', #mitochondrion
+                '5': 'q', #mitochondrial membrane
+                '6': 'n', #nucleus
+                '7': 'z', #nuclear membrane
+                '8': 'h', #chloroplast
+                '9': 'v', #vacuole
+                '10': 'vm', #vacuolar membrane
+                '11': 'r', #endoplasmic reticulum
+                '12': 'en', #endoplasmic reticulum membrane
+                '13': 'x', #peroxisome
+                '14': 'pm', #peroxisomal membrane
+                '15': 'j', #Golgi apparatus
+                '16': 'i', #Golgi membrane
+                '17': 'l', #lysosome
+                '18': 'd', #plastid
+                '19': 'p', #periplasmic space
+                '20': 'pl', #plasma membrane
+                '21': 'o', #outer membrane
+                '22': 'w', #cell wall
+                '23': 'gl', #glycosome
+                '24': 'g', #glyoxysome
+                '25': 'a', #apicoplast
+                '26': 'pr', #provirus
+                '27': 'vi', #virion
+                '28': 'f', #bacterial-type flagellum
+                '29': 'ac', #acidocalcisome
+                '30': 'cl', #cilium
+                '31': 'cs', #cytoskeleton
+                '32': 'ey', #eyespot apparatus
+                '33': 't', #thylakoid
+                '34': 'k', #thylakoid lumen
+                '35': 'y', #thylakoid membrane
+                '36': 'b', #carboxysome
+                '37': 'cy', #cytochrome complex
+                '38': 'ld'} #lipid droplet
+    prefix = "mnxc"
+    for i, component in enumerate(metabolite_id_components):
+        if component.lower().startswith(prefix):
+            # returns characters after the string mnxc
+            mnxc_num = component[len(prefix):]
+            metabolite_id_components[i] = mnxc_dic.get(mnxc_num, 'c')
+            return metabolite_id_components
+    return None
+
+
+def find_bracket(metabolite_id_components):
+    result = []
+    for component in metabolite_id_components:
+        opening_bracket = component.find('[')
+        closing_bracket = component.find(']')
+        if opening_bracket != -1 and closing_bracket != -1 and opening_bracket < closing_bracket:
+            if opening_bracket > 0:
+                result.append(component[:opening_bracket])
+            result.append(component[opening_bracket + 1:closing_bracket])
+            if closing_bracket + 1 < len(component):
+                result.append(component[closing_bracket + 1:])
+        else:
+            result.append(component)
+    return result
+
+
+def compartmentalize(models):
+    num_compartments_used = 0
+    for model in models:
+        compartments_dict = {}
+        for metabolite in model.metabolites:
+            met_id, loc, comp = split_metabolite_id(metabolite.id)
+
+            if loc == 'e' or loc == 'b':
+                metabolite.id = met_id + '_' + loc
+                metabolite.compartment = loc
+            else:
+                if loc is None:
+                    loc = 'c'
+
+                if comp in compartments_dict:
+                    comp = compartments_dict[comp]
+                else:
+                    num_compartments_used += 1
+                    compartments_dict[comp] = num_compartments_used
+                    comp = num_compartments_used
+
+                metabolite.id = met_id + '_' + str(loc) + str(comp)
+                metabolite.compartment = str(loc) + str(comp)
+
+
 # returns a metabolite id in mergem namespace with cellular localization
 def map_metabolite_to_mergem_id(metabolite):
     """
@@ -356,51 +497,38 @@ def map_metabolite_to_mergem_id(metabolite):
     :param metabolite: Cobra metabolite object
     :return: mergem_id notation for the metabolite or None if there is no mapping
     """
-    met_id = metabolite.id.lstrip('_')  # remove leading underscores
-
+    met_id, loc, comp = split_metabolite_id(metabolite.id)
     met_univ_id = __model_handling.met_univ_id_dict.get(met_id)
 
-    split = None
-    if met_univ_id is None:  # Re-check mapping without compartment
-        if '@' in met_id:
-            split = met_id.rsplit('@', 1)
-        else:
-            split = met_id.rsplit("_", 1)
-        met_univ_id = __model_handling.met_univ_id_dict.get(split[0])
+    if (met_univ_id is None) and ('mergem' not in met_id):  # no mapping for metabolite ID
+        for annot in metabolite.annotation:
+            if annot != 'sbo':
+                met_id_from_annot = metabolite.annotation[annot]  # get xref from annotation
+                if type(met_id_from_annot) == str:
+                    met_univ_id = __model_handling.met_univ_id_dict.get(met_id_from_annot)
+                elif type(met_id_from_annot) == list:
+                    for annot_met_id in met_id_from_annot:
+                        if ':' in annot_met_id:
+                            split_annot_id = annot_met_id.split(':', 1)[1]
+                            met_univ_id = __model_handling.met_univ_id_dict.get(split_annot_id)
+                        else:
+                            met_univ_id = __model_handling.met_univ_id_dict.get(annot_met_id)
+                        if met_univ_id:
+                            break
+                if met_univ_id:
+                    break
 
-        if (met_univ_id is None) and ('mergem' not in met_id):  # no mapping for metabolite ID
-            for annot in metabolite.annotation:
-                if annot != 'sbo':
-                    met_id_from_annot = metabolite.annotation[annot]  # get xref from annotation
-                    if type(met_id_from_annot) == str:
-                        met_univ_id = __model_handling.met_univ_id_dict.get(met_id_from_annot)
-                    elif type(met_id_from_annot) == list:
-                        for annot_met_id in met_id_from_annot:
-                            if ':' in annot_met_id:
-                                split_annot_id = annot_met_id.split(':', 1)[1]
-                                met_univ_id = __model_handling.met_univ_id_dict.get(split_annot_id)
-                            else:
-                                met_univ_id = __model_handling.met_univ_id_dict.get(annot_met_id)
-                            if met_univ_id:
-                                break
-                    if met_univ_id:
-                        break
-        if met_univ_id is None:
-            return None
+    if met_univ_id is None:
+        return None
 
-    met_compartment = __model_handling.map_localization(metabolite.compartment)
-    if met_compartment == '':
-        if split is None:
-            if '@' in met_id:
-                split = met_id.rsplit('@', 1)
-            else:
-                split = met_id.rsplit("_", 1)
-        if len(split) > 1:
-            met_compartment = __model_handling.map_localization(split[1])
-            if met_compartment == '':
-                met_compartment = split[1]
+    mergem_id = "mergem_" + str(met_univ_id)
 
-    return "mergem_" + str(met_univ_id) + "_" + met_compartment
+    if loc:
+        mergem_id += "_" + loc
+        if comp:
+             mergem_id += str(comp)
+
+    return mergem_id
 
 
 # reaction key is a frozenset of tuples of participating mets with their stoichiometric coeffs

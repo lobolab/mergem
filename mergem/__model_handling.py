@@ -40,7 +40,7 @@ localization_dict = {'p': 'p', 'p0': 'p', 'periplasm': 'p', 'periplasm_0': 'p', 
                      'extracellular space': 'e', 'mnxc2': 'e',
                      'm': 'm', 'mitochondria': 'm', 'mitochondria_0': 'm', 'mnxc4': 'm',
                      'b': 'b', 'boundary': 'b',
-                     'x': 'p/glyoxysome', 'mnxc24': 'p/glyoxysome', 'mnxc13': 'p/glyoxysome',
+                     'x': 'g', 'mnxc24': 'g', 'mnxc13': 'g',
                      'h': 'h', 'choloroplast': 'h', 'mnxc8': 'h',
                      'v': 'v', 'vacuole': 'v', 'mnxc9': 'v',
                      'n': 'n', 'nucleus': 'n', 'mnxc6': 'n'}

@@ -21,33 +21,88 @@ For detailed usage instructions, please refer to the [documentation](https://mer
 Command-line options can be viewed using "--help" flag, as shown below:
 
     > mergem --help
-    Usage: mergem [OPTIONS] [INPUT_FILENAMES]...
+    Usage: mergem [INPUT_FILENAMES] [OPTIONS]
 
-    mergem takes genome-scale metabolic models as input, merges them into a single model and saves the merged model as .xml. Users can optionally select the objective, provide an output filename for the merged model, and translate the models to a different namespace.
+    mergem takes genome-scale metabolic models as input, merges them into a
+    single model and saves merged model as .xml. Users can optionally select the
+    objective and provide an output filename for merged model, and translate the 
+    models to a different namespace.
 
     Lobo Lab (https://lobolab.umbc.edu)
 
     Options:
-    -obj TEXT  Set objective: 'merge' all objectives (default) or 1, 2, 3... (objective from one of the input models)  
-    -o TEXT    Save model as (filename with format .xml, .sbml, etc.)  
+    -obj TEXT  Set objective: 'merge' all objectives (default) or 1, 2, 3...
+             (objective from one of the input models)
+    -o TEXT    Save merged model as (filename with format .xml, .sbml, etc.)
     -v         Print merging statistics
     -up        Update ID mapping table
     -s         Save ID mapping table as CSV
     -e         Uses exact stoichiometry when merging reactions
     -p         Consider protonation when merging reactions
     -a         Extend annotations with mergem database of metabolites and reactions
-    -t TEXT    Translate all metabolite and reaction IDs to a target namespace (chebi, metacyc, kegg, reactome, metanetx, hmdb, biocyc, bigg, seed, sabiork, or rhea)
+    -t         Translate metabolite and reaction IDs to a target namespace (chebi, metacyc, 
+               kegg, reactome, metanetx, hmdb, biocyc, bigg, seed, sabiork, or rhea)
+    -c         output as a community model
     --version  Show the version and exit.
     --help     Show this message and exit.
 
  
 For merging two models and setting objective of merged model from first model, use:
 
-    mergem -i model1.xml -i model2.xml -obj 1
+    mergem model1.xml model2.xml
 
-To print merging statistics, append the "-v" flag:
 
-    mergem -i model1.xml -i model2.xml -obj 1 -v 
+The `-obj` argument can be used to set the objective function of merged model. Allowed values include `merge` to merge input model objective functions (default) or an integer representing the objective function from the model in order of input (1, 2, 3, ..):
+
+    mergem model1.xml model2.xml -obj 1
+
+
+To print merge statistics, append the `-v` flag:
+
+    mergem model1.xml model2.xml -v
+
+
+Output model filename can be provided using the `-o` argument followed by desired output filename with file format specified in the extension (.xml, ...):
+
+
+    mergem model.xml model2.xml -o mergedmodel.xml
+
+
+Save the ID mapping table as a CSV file by using the `-s` argument:
+
+
+    mergem model1.xml model2.xml -s
+
+
+By default, reactions are merged when they have both a similar set of reactants and a similar set of products, without comparing their stoichiometry. To merge reactions only when they have the same exact stoichiometry in their reactants and products, use the `-e` argument:
+
+
+    mergem model1.xml model2.xml -e
+
+
+By default, reactions are compared ignoring the hydrogen and proton metabolites. To consider also the hydrogen and proton metabolites when comparing reactions, use the `-p` argument:
+
+
+    mergem model1.xml model2.xml -p
+
+
+Metabolite and reaction annotations are merged from all input models. In addition, mergem can extend these annotations using the mergem database. For extending the annotations using mergem database, use the `-a` argument:
+
+
+    mergem model1.xml model2.xml -a
+
+
+Mergem can translate the metabolite and reaction IDs to another database system when using the `-t` argument:
+
+
+    mergem model1.xml -t chebi
+
+
+Mergem can merge models into a community models using the `-c` argument. In addition, the metabolites of a single model can be assigned compartments without merging:
+
+
+    mergem model1.xml model2.xml -c
+
 
 #### Python usage
 
@@ -57,7 +112,7 @@ To use mergem  within a python script, simply import the package with:
 
 For merging or processing one, two, or more models, provide a list of models to the merge function:
 
-    results = mergem.merge(input_models, set_objective='merge', exact_sto=False use_prot=False, extend_annot=False, trans_to_db=None)
+    results = mergem.merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, extend_annot=False, trans_to_db=None, community_model=False)
     merged_model = results['merged_model']
     jacc_matrix = results['jacc_matrix']
     num_met_merged = results['num_met_merged']
@@ -71,6 +126,7 @@ For merging or processing one, two, or more models, provide a list of models to 
 * `use_prot` consider hydrogen and proton metabolites when merging reactions.
 * `add_annot` add additional metabolite and reaction annotations from mergem dictionaries.
 * `trans_to_db` translate metabolite and reaction IDs to a target database (chebi, metacyc, kegg, reactome, metanetx, hmdb, biocyc, bigg, seed, sabiork, or rhea)
+* `community_model` consider community metabolites when merging
 
 * `results` a dictionary with all the results, including:
 * `merged_model` the merged model.
@@ -80,9 +136,7 @@ For merging or processing one, two, or more models, provide a list of models to 
 * `met_sources` dictionary mapping each metabolite ID in the merged model to the corresponding metabolite IDs from each of the input models.
 * `reac_sources` dictionary mapping each reaction ID in the merged model to the corresponding reaction IDs from each of the input models.
 
-The merge function returns a dictionary of results including the merged model,
-the metabolite and reaction Jaccard distance matrix between models, and the 
-metabolite and reaction model sources. 
+The merge function returns a dictionary of results including the merged model, the metabolite and reaction Jaccard distance matrix between models, and the metabolite and reaction model sources. 
 
 
 The following functions can also be imported from mergem:
