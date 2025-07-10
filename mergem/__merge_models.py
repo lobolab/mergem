@@ -34,7 +34,7 @@ def merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, 
     :param use_prot: Boolean to consider hydrogen and proton when merging reactions
     :param add_annot: Boolean to add additional metabolite and reaction annotations from mergem dictionaries
     :param trans_to_db: target database to be translated to
-    :param community_model: Boolean to consider community metabolites when merging
+    :param community_model: Boolean to keep each model on its own compartment when merging
     :return: a dictionary of the merged model, met & reac jaccard distances, num of mets and reacs merged,
             and met & reac sources.
     """
@@ -63,8 +63,9 @@ def merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, 
     merged_model_metabolites = []
     merged_model_reactions = []
 
+    community_compartments = {}
     if community_model:
-        compartmentalize(models)
+        community_compartments = compartmentalize(models)
 
     # Add first model
     model = models[0]
@@ -74,9 +75,7 @@ def merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, 
 
     dict_met_annot, dict_reac_annot, dict_gprs = {}, {}, {}
 
-
-
-    merged_compartments = model.compartments
+    merged_compartments = model.compartments | community_compartments
 
     for metabolite in model.metabolites:
         merged_model_metabolites.append(metabolite)
@@ -242,8 +241,12 @@ def merge(input_models, set_objective='merge', exact_sto=False, use_prot=False, 
         if set_objective == 'merge':
             num_reacs_merged += 1
 
-    merged_model, reac_sources_dict = set_objective_expression(merged_model, reac_sources_dict, models,
-                                                              objective_reactions, set_objective)
+    if community_model:
+        merged_model, met_sources_dict, reac_sources_dict = set_objective_expression_community(merged_model, met_sources_dict, 
+                                                                                               reac_sources_dict, objective_reactions)
+    else:
+        merged_model, reac_sources_dict = set_objective_expression(merged_model, reac_sources_dict, models,
+                                                                   objective_reactions, set_objective)
 
     merged_model.repair()
 
@@ -466,15 +469,19 @@ def find_bracket(metabolite_id_components):
 
 
 def compartmentalize(models):
+    community_compartments = {}
     num_compartments_used = 0
     for model in models:
         compartments_dict = {}
         for metabolite in model.metabolites:
             met_id, loc, comp = split_metabolite_id(metabolite.id)
 
+            if(not loc):
+                loc = metabolite.compartment
+
             if loc == 'e' or loc == 'b':
                 metabolite.id = met_id + '_' + loc
-                metabolite.compartment = loc
+                new_met_compartment = loc
             else:
                 if loc is None:
                     loc = 'c'
@@ -487,7 +494,30 @@ def compartmentalize(models):
                     comp = num_compartments_used
 
                 metabolite.id = met_id + '_' + str(loc) + str(comp)
-                metabolite.compartment = str(loc) + str(comp)
+                new_met_compartment = str(loc) + str(comp)
+
+            if new_met_compartment not in community_compartments:
+                community_compartments[new_met_compartment] = model.compartments[metabolite.compartment] + ((" " + str(comp)) if comp else "")
+
+            metabolite.compartment = new_met_compartment
+
+        for reaction in model.reactions:
+            reac_comps = reaction.compartments
+            reac_id = reaction.id
+            while True:
+                for reac_comp in reac_comps:
+                    if reac_id.endswith('_' + reac_comp):
+                        reac_id = reac_id[:-(1+len(reac_comp))]
+                        continue
+                break
+
+            if len(reac_comps) == 1:
+                reac_comp = next(iter(reac_comps))
+                reaction.id = reac_id + '_' + reac_comp + '_' + reac_comp # Avoids reaction ids similar to metabolite ids
+            else:
+                reaction.id = reac_id + '_' + '_'.join(reac_comps)
+
+    return community_compartments
 
 
 # returns a metabolite id in mergem namespace with cellular localization
@@ -548,7 +578,7 @@ def create_reaction_key(reaction, exact_sto, use_prot):
             continue
 
         elif reactant.id[-1] != 'b':
-            id = reactant.id if reactant.id.startswith('mergem_') else map_metabolite_to_mergem_id(reactant)
+            id = reactant.id
             stoc = reaction.metabolites[reactant] if exact_sto else 1
             metabolite_set = (id, -stoc)
             rev_met_set = (id, stoc)
@@ -559,7 +589,7 @@ def create_reaction_key(reaction, exact_sto, use_prot):
         if (not use_prot) and (product.id.startswith(__model_handling.proton_mergem_id) or product.name == "PMF"):
             continue
         elif product.id[-1] != 'b':
-            id = product.id if product.id.startswith('mergem_') else map_metabolite_to_mergem_id(product)
+            id = product.id
             stoc = reaction.metabolites[product] if exact_sto else 1
             metabolite_set = (id, stoc)
             rev_met_set = (id, -stoc)
@@ -596,7 +626,6 @@ def set_objective_expression(merged_model, reac_sources_dict, models, objective_
     return merged_model, reac_sources_dict
 
 
-# create a reaction that contains input model objective reacs merged together
 def create_merged_objective(merged_model, reac_sources_dict, objective_reactions):
     """
     Merges objective reactions in list and sets as objective in input merged model.
@@ -632,6 +661,37 @@ def create_merged_objective(merged_model, reac_sources_dict, objective_reactions
         merged_model.objective = merged_obj_reaction_id
 
     return merged_model, reac_sources_dict
+
+
+def set_objective_expression_community(merged_model, met_sources_dict, reac_sources_dict, objective_reactions):
+    """
+    Sets objective reactions into compartments and creates a new objective for merged model.
+    :param merged_model: Merged model to set objective of
+    :param met_source_dict: dictionary with source of each metabolite
+    :param reac_source_dict: dictionary with source of each reaction
+    :param objective_reactions: list of objective reaction lists
+    :return: Merged model with its objective set to the community objective reactions
+    """
+    merged_obj_reaction_id = 'cpd11416_c0'
+    merged_obj_reaction = cobra.Reaction(merged_obj_reaction_id, 'Merged biomass') # TODO: check the reaction id does not exist already
+    comp_bio_stoic = -1.0/len(objective_reactions)
+
+    for model_index, reaction_list in enumerate(objective_reactions):
+        model_index_str = str(1 + model_index)
+        model_bio_met = cobra.Metabolite('bio_c' + model_index_str, None, 'Biomass compartment ' + model_index_str, None, 'c' + model_index_str)
+        met_sources_dict[model_bio_met.id][model_index].append(model_bio_met.id)
+        merged_obj_reaction.add_metabolites({model_bio_met: comp_bio_stoic})
+        reac_sources_dict[merged_obj_reaction_id][model_index].append(merged_obj_reaction_id)    
+
+        for reaction in reaction_list:
+            reaction.add_metabolites({model_bio_met: 1})
+            merged_model.add_reactions([reaction])
+            reac_sources_dict[reaction.id][model_index].append(reaction.id)            
+
+    merged_model.add_reactions([merged_obj_reaction])
+    merged_model.objective = merged_obj_reaction_id
+
+    return merged_model, met_sources_dict, reac_sources_dict
 
 
 def compute_jaccard_matrix(num_models, met_source_dict, reac_source_dict):
