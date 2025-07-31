@@ -33,12 +33,11 @@ met_univ_id_prop_dict_file = os.path.join(data_dir, 'metaboliteInfo.p')
 reac_univ_id_dict_file = os.path.join(data_dir, 'reactionIdMapper.p')
 reac_univ_id_prop_dict_file = os.path.join(data_dir, 'reactionInfo.p')
 
-localization_dict = {'p': 'p', 'p0': 'p', 'periplasm': 'p', 'periplasm_0': 'p', 'mnxc19': 'p',
-                     'c': 'c', 'c0': 'c', 'cytosol': 'c', 'cytosol_0': 'c', 'cytoplasm': 'c', 'mnxc3': 'c',
-                     'cytoplasm_0': 'c',
-                     'e': 'e', 'e0': 'e', 'extracellular': 'e', 'extracellular_0': 'e',
+localization_dict = {'p': 'p', 'periplasm': 'p', 'mnxc19': 'p',
+                     'c': 'c', 'cytosol': 'c', 'cytoplasm': 'c', 'mnxc3': 'c',
+                     'e': 'e', 'extracellular': 'e',
                      'extracellular space': 'e', 'mnxc2': 'e',
-                     'm': 'm', 'mitochondria': 'm', 'mitochondria_0': 'm', 'mnxc4': 'm',
+                     'm': 'm', 'mitochondria': 'm', 'mnxc4': 'm',
                      'b': 'b', 'boundary': 'b',
                      'x': 'g', 'mnxc24': 'g', 'mnxc13': 'g',
                      'h': 'h', 'choloroplast': 'h', 'mnxc8': 'h',
