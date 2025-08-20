@@ -33,16 +33,15 @@ met_univ_id_prop_dict_file = os.path.join(data_dir, 'metaboliteInfo.p')
 reac_univ_id_dict_file = os.path.join(data_dir, 'reactionIdMapper.p')
 reac_univ_id_prop_dict_file = os.path.join(data_dir, 'reactionInfo.p')
 
-localization_dict = {'p': 'p', 'periplasm': 'p', 'mnxc19': 'p',
-                     'c': 'c', 'cytosol': 'c', 'cytoplasm': 'c', 'mnxc3': 'c',
-                     'e': 'e', 'extracellular': 'e',
-                     'extracellular space': 'e', 'mnxc2': 'e',
-                     'm': 'm', 'mitochondria': 'm', 'mnxc4': 'm',
-                     'b': 'b', 'boundary': 'b',
-                     'x': 'g', 'mnxc24': 'g', 'mnxc13': 'g',
-                     'h': 'h', 'choloroplast': 'h', 'mnxc8': 'h',
-                     'v': 'v', 'vacuole': 'v', 'mnxc9': 'v',
-                     'n': 'n', 'nucleus': 'n', 'mnxc6': 'n'}
+localization_dict = {'periplasm': 'p',
+                     'cytosol': 'c', 'cytoplasm': 'c',
+                     'extracellular': 'e',
+                     'extracellular space': 'e',
+                     'mitochondria': 'm',
+                     'boundary': 'b',
+                     'choloroplast': 'h',
+                     'vacuole': 'v',
+                     'nucleus': 'n',}
 
 proton_mergem_id = ''
 
@@ -157,7 +156,10 @@ def map_localization(id_or_model_localization):
     :param id_or_model_localization: cellular localization of entity in model
     :return: single letter cellular localization
     """
-    localization = localization_dict.get(id_or_model_localization.lower(), '')
+    if len(id_or_model_localization) == 1:
+        localization = id_or_model_localization
+    else:
+        localization = localization_dict.get(id_or_model_localization.lower(), '')
 
     return localization
 

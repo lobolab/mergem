@@ -369,7 +369,7 @@ def split_metabolite_id(metabolite_id):
     else:
         separated_id = metabolite_id.split('_')
 
-    mnxc_metabolites = find_mnxc(separated_id)
+    mnxc_metabolites = replace_mnxc(separated_id)
     if mnxc_metabolites is not None:
         separated_id = mnxc_metabolites
 
@@ -402,7 +402,7 @@ def split_metabolite_id(metabolite_id):
     return met_id, loc, comp
 
 
-def find_mnxc(metabolite_id_components):
+def replace_mnxc(metabolite_id_components):
     mnxc_dic = {'0': 'u', #cellular component
                 '1': 's', #cell
                 '2': 'e', #extracellular region
@@ -470,9 +470,8 @@ def find_bracket(metabolite_id_components):
 
 def compartmentalize(models):
     community_compartments = {}
-    num_compartments_used = 0
-    for model in models:
-        compartments_dict = {}
+    for model_index, model in enumerate(models, start=1):
+        model_orig_compartments = model.compartments.keys()
         for metabolite in model.metabolites:
             met_id, loc, comp = split_metabolite_id(metabolite.id)
 
@@ -486,31 +485,37 @@ def compartmentalize(models):
                 if loc is None:
                     loc = 'c'
 
-                if comp in compartments_dict:
-                    comp = compartments_dict[comp]
-                else:
-                    num_compartments_used += 1
-                    compartments_dict[comp] = num_compartments_used
-                    comp = num_compartments_used
+                comp = (str(comp) if comp else "") + str(model_index)
 
-                metabolite.id = met_id + '_' + str(loc) + str(comp)
-                new_met_compartment = str(loc) + str(comp)
+                metabolite.id = met_id + '_' + str(loc) + comp
+                new_met_compartment = str(loc) + comp
 
             if new_met_compartment not in community_compartments:
-                community_compartments[new_met_compartment] = model.compartments[metabolite.compartment] + ((" " + str(comp)) if comp else "")
+                comp_str = model.compartments[metabolite.compartment]
+                if comp_str:
+                    comp_str = comp_str.rstrip('0123456789 ') + ((" " + comp) if comp else "")
+                else:
+                    comp_str = new_met_compartment
+                
+                community_compartments[new_met_compartment] = comp_str
+
+            if metabolite.name.endswith(metabolite.compartment):
+                metabolite.name = metabolite.name[:-len(metabolite.compartment)] + new_met_compartment
 
             metabolite.compartment = new_met_compartment
 
         for reaction in model.reactions:
             reac_comps = reaction.compartments
             reac_id = reaction.id
-            while True:
-                for reac_comp in reac_comps:
-                    if reac_id.endswith('_' + reac_comp):
-                        reac_id = reac_id[:-(1+len(reac_comp))]
-                        continue
-                break
-
+            found = True
+            while found:
+                found = False
+                for orig_comp in model_orig_compartments:
+                    if reac_id.endswith('_' + orig_comp):
+                        reac_id = reac_id[:-(1+len(orig_comp))]
+                        found = True
+                        break
+            
             if len(reac_comps) == 1:
                 reac_comp = next(iter(reac_comps))
                 reaction.id = reac_id + '_' + reac_comp + '_' + reac_comp # Avoids reaction ids similar to metabolite ids
@@ -672,7 +677,7 @@ def set_objective_expression_community(merged_model, met_sources_dict, reac_sour
     :param objective_reactions: list of objective reaction lists
     :return: Merged model with its objective set to the community objective reactions
     """
-    merged_obj_reaction_id = 'cpd11416_c0'
+    merged_obj_reaction_id = 'cpd11416'
     merged_obj_reaction = cobra.Reaction(merged_obj_reaction_id, 'Merged biomass') # TODO: check the reaction id does not exist already
     comp_bio_stoic = -1.0/len(objective_reactions)
 
